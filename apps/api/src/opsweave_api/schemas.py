@@ -87,6 +87,14 @@ class WorkspaceInfoRead(BaseModel):
     model_alias: str | None
     model_calls_configured: bool
     max_upload_bytes: int
+    preferences: dict[str, str] = Field(default_factory=dict)
+
+
+class WorkspacePreferences(BaseModel):
+    timezone: str = Field(default="UTC", min_length=2, max_length=80)
+    notifications: str = Field(default="Failures and approvals", min_length=2, max_length=80)
+    retention: str = Field(default="90 days", pattern="^(30 days|90 days|1 year)$")
+    review_threshold: str = Field(default="85%", pattern="^(75%|85%|95%)$")
 
 
 class WorkflowPublishRequest(BaseModel):

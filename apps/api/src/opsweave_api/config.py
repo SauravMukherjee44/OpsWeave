@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     session_secret: str = "local-development-secret-change-before-deploy"
     model_calls_enabled_parameter: str | None = None
     claims_state_machine_arn: str | None = None
+    cognito_domain: str | None = None
+    cognito_client_id: str | None = None
+    public_app_url: str = "http://localhost:3000"
     max_upload_bytes: int = 25 * 1024 * 1024
     demo_tenant_id: str = "00000000-0000-0000-0000-000000000001"
 

@@ -64,6 +64,20 @@ class CloudRepository:
                 kwargs["ExclusiveStartKey"] = cursor
         return await asyncio.to_thread(query_all)
 
+    async def workspace_preferences(self, tenant_id: str) -> dict[str, str]:
+        if not self.enabled:
+            return {}
+        response = await asyncio.to_thread(self._table().get_item, Key={"pk": f"TENANT#{tenant_id}", "sk": "SETTINGS#WORKSPACE"})
+        return response.get("Item", {}).get("preferences", {})
+
+    async def put_workspace_preferences(self, tenant_id: str, preferences: dict[str, str]) -> None:
+        if not self.enabled:
+            return
+        await asyncio.to_thread(self._table().put_item, Item={
+            "pk": f"TENANT#{tenant_id}", "sk": "SETTINGS#WORKSPACE", "entity_type": "workspace_settings",
+            "tenant_id": tenant_id, "preferences": preferences, "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+
     async def put_artifact(self, artifact: Any) -> None:
         if not self.enabled:
             return

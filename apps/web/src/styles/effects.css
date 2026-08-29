@@ -1,0 +1,345 @@
+/* ==========================================================================
+   Effects layer — bespoke visuals that utilities cannot express cleanly
+   ========================================================================== */
+
+.spin {
+  animation: spin .9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --------------------------------------------------------------------------
+   Ambient lighting
+   -------------------------------------------------------------------------- */
+
+.ambient-glow {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: .5;
+}
+
+.ambient-glow.one {
+  left: -8%;
+  top: -14%;
+  width: 42vw;
+  height: 42vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--brand-coral) 34%, transparent), transparent 70%);
+}
+
+.ambient-glow.two {
+  right: -10%;
+  top: -6%;
+  width: 38vw;
+  height: 38vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--brand-violet) 32%, transparent), transparent 70%);
+}
+
+.ambient-glow.three {
+  left: 34%;
+  bottom: -22%;
+  width: 46vw;
+  height: 34vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary-500) 24%, transparent), transparent 72%);
+}
+
+:root[data-theme="light"] .ambient-glow {
+  opacity: .32;
+}
+
+/* --------------------------------------------------------------------------
+   Brand mark — interlocking weave built from the brand ramp
+   -------------------------------------------------------------------------- */
+
+.brand-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 30%;
+  background: var(--gradient-brand);
+  color: #fff;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--brand-rose) 32%, transparent);
+}
+
+.brand-mark svg {
+  width: 62%;
+  height: 62%;
+}
+
+.brand-mark.flat {
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   Boot preloader
+   -------------------------------------------------------------------------- */
+
+.portal-preloader {
+  position: fixed;
+  z-index: 999;
+  inset: 0;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.preloader-grid {
+  position: absolute;
+  inset: -20%;
+  opacity: .2;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at center, #000 0, transparent 64%);
+  transform: perspective(700px) rotateX(58deg) translateY(24%);
+  transform-origin: center bottom;
+}
+
+.preloader-aura {
+  position: absolute;
+  width: min(640px, 88vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 200deg,
+    color-mix(in srgb, var(--brand-coral) 22%, transparent),
+    color-mix(in srgb, var(--brand-rose) 20%, transparent),
+    color-mix(in srgb, var(--brand-violet) 22%, transparent),
+    color-mix(in srgb, var(--primary-500) 18%, transparent),
+    color-mix(in srgb, var(--brand-coral) 22%, transparent)
+  );
+  filter: blur(80px);
+  animation: preloader-breathe 3.6s ease-in-out infinite;
+}
+
+.preloader-content {
+  position: relative;
+  width: min(430px, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.preloader-mark {
+  position: relative;
+  width: 172px;
+  height: 172px;
+  margin-bottom: 26px;
+  display: grid;
+  place-items: center;
+}
+
+.preloader-mark .brand-mark {
+  position: relative;
+  z-index: 4;
+  width: 74px;
+  height: 74px;
+  border-radius: 24px;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, .32),
+    0 0 46px color-mix(in srgb, var(--brand-violet) 34%, transparent);
+}
+
+.preloader-ring {
+  position: absolute;
+  border: 1px solid color-mix(in srgb, var(--brand-violet) 26%, var(--border));
+  border-radius: 50%;
+  animation: preloader-spin 7s linear infinite;
+}
+
+.preloader-ring::before,
+.preloader-ring::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 15px currentColor;
+}
+
+.ring-one { inset: 24px; }
+.ring-one::before { left: 8px; top: 16px; background: var(--brand-coral); color: var(--brand-coral); }
+.ring-one::after { right: 4px; bottom: 24px; background: var(--brand-violet); color: var(--brand-violet); }
+
+.ring-two {
+  inset: 2px;
+  border-style: dashed;
+  opacity: .5;
+  animation-duration: 13s;
+  animation-direction: reverse;
+}
+
+.ring-two::before { left: 29px; bottom: 12px; background: var(--brand-rose); color: var(--brand-rose); }
+.ring-two::after { right: 20px; top: 22px; background: var(--primary-400); color: var(--primary-400); }
+
+.preloader-orbit {
+  position: absolute;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--elevation-2);
+}
+
+.preloader-orbit svg { width: 16px; height: 16px; }
+.orbit-one { left: 2px; top: 66px; color: var(--brand-coral); animation: preloader-float 2.4s ease-in-out infinite; }
+.orbit-two { right: 12px; top: 16px; color: var(--brand-rose); animation: preloader-float 2.7s ease-in-out .25s infinite; }
+.orbit-three { left: 30px; bottom: 8px; color: var(--brand-violet); animation: preloader-float 2.6s ease-in-out .4s infinite; }
+.orbit-four { right: 0; bottom: 38px; color: var(--primary-400); animation: preloader-float 2.5s ease-in-out .1s infinite; }
+
+.preloader-brand strong,
+.preloader-brand span {
+  display: block;
+}
+
+.preloader-brand strong {
+  font-size: 1.6875rem;
+  font-weight: 670;
+  letter-spacing: -.05em;
+}
+
+.preloader-brand span {
+  margin-top: 7px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.preloader-progress {
+  width: 244px;
+  height: 4px;
+  margin-top: 26px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface-3);
+}
+
+.preloader-progress span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gradient-brand);
+  animation: preloader-progress 1.5s cubic-bezier(.65, 0, .35, 1) infinite;
+}
+
+.preloader-content > p {
+  height: 20px;
+  margin: 18px 0 0;
+  color: var(--text-2);
+  font-size: 0.75rem;
+}
+
+.preloader-content > small {
+  margin-top: 9px;
+  color: var(--faint);
+  font-size: 0.6875rem;
+}
+
+.loading-dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 5px;
+}
+
+.loading-dots i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: preloader-dot 1.2s ease-in-out infinite;
+}
+
+.loading-dots i:nth-child(2) { animation-delay: .15s; }
+.loading-dots i:nth-child(3) { animation-delay: .3s; }
+
+@keyframes preloader-spin { to { transform: rotate(360deg); } }
+@keyframes preloader-breathe { 50% { transform: scale(1.08); opacity: .74; } }
+@keyframes preloader-float { 50% { transform: translateY(-7px); } }
+@keyframes preloader-progress { 0% { transform: translateX(-115%); } 100% { transform: translateX(240%); } }
+@keyframes preloader-dot { 0%, 60%, 100% { opacity: .28; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+
+/* --------------------------------------------------------------------------
+   Paint helpers used by the primitives
+   Kept as classes rather than long arbitrary Tailwind values so component
+   markup stays readable.
+   -------------------------------------------------------------------------- */
+
+.bg-brand-gradient { background-image: var(--gradient-brand); }
+.bg-primary-gradient { background-image: var(--gradient-primary); }
+.bg-surface-gradient { background-image: var(--gradient-surface); }
+.bg-brand-soft { background-image: var(--gradient-brand-soft); }
+
+.shadow-brand { box-shadow: 0 8px 24px color-mix(in srgb, var(--brand-rose) 28%, transparent); }
+.shadow-primary { box-shadow: 0 8px 22px color-mix(in srgb, var(--primary-500) 26%, transparent); }
+
+.card-sheen {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent),
+    var(--elevation-2);
+}
+
+:root[data-theme="light"] .card-sheen {
+  box-shadow: var(--elevation-2);
+}
+
+/* --------------------------------------------------------------------------
+   GPU moments — boot, empty states, auth
+   -------------------------------------------------------------------------- */
+
+.auth-shader {
+  display: block;
+  width: 176px;
+  height: 132px;
+}
+
+.shader-stage {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Shared motion
+   -------------------------------------------------------------------------- */
+
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, .05), transparent 68%);
+  transform: translateX(-100%);
+  animation: sheen-sweep 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes sheen-sweep {
+  0%, 55% { transform: translateX(-100%); }
+  85%, 100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-dot {
+  50% { opacity: .45; transform: scale(.75); }
+}

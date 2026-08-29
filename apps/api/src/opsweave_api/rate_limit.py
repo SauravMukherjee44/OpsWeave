@@ -33,7 +33,16 @@ class Policy:
 
 
 def policy_for(path: str, method: str) -> Policy | None:
-    if method != "POST" or not path.startswith("/v1/"):
+    if not path.startswith("/v1/"):
+        return None
+    if method == "GET":
+        return Policy(
+            client=(Limit(180, 60, "read-minute"),),
+            ip=(Limit(360, 60, "read-ip-minute"), Limit(5000, DAY, "read-ip-day")),
+            tenant=(Limit(20_000, DAY, "read-tenant-day"),),
+            global_=(Limit(50_000, DAY, "read-global-day"),),
+        )
+    if method not in {"POST", "PATCH", "DELETE"}:
         return None
     if path.endswith("/compilations"):
         return Policy(
@@ -103,7 +112,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         client_id, issued = self._client(request)
         ip_id = self._opaque("ip", request.client.host if request.client else "unknown")
-        tenant_id = request.headers.get("x-tenant-id", "anonymous")[:80]
+        tenant_id = self._opaque("session", request.cookies["opsweave_access"]) if request.cookies.get("opsweave_access") else request.headers.get("x-tenant-id", "anonymous")[:80]
         checks = (
             *(("client", client_id, limit) for limit in policy.client),
             *(("ip", ip_id, limit) for limit in policy.ip),
@@ -143,14 +152,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def _increment(self, key: str, expires_at: int) -> int:
         if self.table is not None:
-            result = await asyncio.to_thread(
-                self.table.update_item,
-                Key={"pk": key},
-                UpdateExpression="SET expires_at = if_not_exists(expires_at, :expiry) ADD request_count :one",
-                ExpressionAttributeValues={":expiry": expires_at, ":one": 1},
-                ReturnValues="UPDATED_NEW",
-            )
-            return int(result["Attributes"]["request_count"])
+            try:
+                result = await asyncio.to_thread(
+                    self.table.update_item,
+                    Key={"pk": key},
+                    UpdateExpression="SET expires_at = if_not_exists(expires_at, :expiry) ADD request_count :one",
+                    ExpressionAttributeValues={":expiry": expires_at, ":one": 1},
+                    ReturnValues="UPDATED_NEW",
+                )
+                return int(result["Attributes"]["request_count"])
+            except Exception:
+                if self.secure_cookie:
+                    raise
+                # Local development remains usable when an optional AWS profile expires.
+                pass
         with self.lock:
             count, expiry = self.local.get(key, (0, expires_at))
             if expiry <= int(time.time()):

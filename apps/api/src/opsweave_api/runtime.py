@@ -48,6 +48,8 @@ class RuntimeService:
         return boto3.client("stepfunctions", region_name=self.region)
 
     async def project_items(self, project_id: str, tenant_id: str) -> list[dict[str, Any]]:
+        if not self.enabled:
+            return []
         items = await asyncio.to_thread(self._query_project_items, project_id)
         return [item for item in items if item.get("tenant_id") == tenant_id]
 

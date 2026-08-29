@@ -1,12 +1,19 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import asyncio
+import base64
+import hashlib
+import json
 import logging
 from pathlib import Path
+import secrets
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest, urlopen
 import uuid
 
-from fastapi import Body, Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from mangum import Mangum
 from sqlalchemy import func, select
@@ -24,7 +31,7 @@ from .runtime import RuntimeService, json_safe
 from .schemas import (
     ApprovalDecision, ArtifactRead, AuditEventRead, CompilationRead, EvaluationCreate, ExecutionCreate,
     HealthResponse, PresignRequest, PresignResponse, ProjectCreate, ProjectRead,
-    WorkflowPublishRequest, WorkspaceInfoRead,
+    WorkflowPublishRequest, WorkspaceInfoRead, WorkspacePreferences,
 )
 from .storage import ArtifactStorage
 
@@ -35,7 +42,7 @@ cloud = CloudRepository(settings)
 runtime = RuntimeService(settings)
 logger = logging.getLogger("opsweave.api")
 workspace_hydration_lock = asyncio.Lock()
-workspace_hydrated = False
+hydrated_tenants: set[str] = set()
 
 
 @asynccontextmanager
@@ -51,37 +58,37 @@ async def lifespan(_: FastAPI):
     yield
 
 
-async def hydrate_workspace() -> None:
+async def hydrate_workspace(tenant_id: str | None = None) -> None:
     """Hydrate cloud state only for API requests, never for static asset requests."""
-    global workspace_hydrated
-    if workspace_hydrated or settings.environment == "local" or not cloud.enabled:
+    tenant_id = tenant_id or settings.demo_tenant_id
+    if tenant_id in hydrated_tenants or settings.environment == "local" or not cloud.enabled:
         return
     async with workspace_hydration_lock:
-        if workspace_hydrated:
+        if tenant_id in hydrated_tenants:
             return
         async with SessionFactory() as session:
-            for remote_project in await cloud.tenant_projects(settings.demo_tenant_id):
+            for remote_project in await cloud.tenant_projects(tenant_id):
                 project_id = remote_project["project_id"]
                 if await session.get(Project, project_id) is None:
                     session.add(Project(
-                        id=project_id, tenant_id=settings.demo_tenant_id,
+                        id=project_id, tenant_id=tenant_id,
                         name=remote_project["name"], description=remote_project.get("description", ""),
                         status=ProjectStatus(remote_project.get("status", "draft")),
                         created_at=datetime.fromisoformat(remote_project["created_at"]),
                         updated_at=datetime.fromisoformat(remote_project["updated_at"]),
                     ))
                     await session.flush()
-                remote_workspace = await cloud.project_workspace(project_id, settings.demo_tenant_id)
+                remote_workspace = await cloud.project_workspace(project_id, tenant_id)
                 for item in remote_workspace["artifacts"]:
                     if await session.get(Artifact, item["artifact_id"]) is None:
                         session.add(Artifact(
-                            id=item["artifact_id"], tenant_id=settings.demo_tenant_id, project_id=project_id,
+                            id=item["artifact_id"], tenant_id=tenant_id, project_id=project_id,
                             filename=item["filename"], media_type=item["media_type"], size_bytes=int(item["size_bytes"]),
                             storage_key=item["storage_key"], checksum_sha256=item["checksum_sha256"],
                             status=item.get("status", "stored"), created_at=datetime.fromisoformat(item["created_at"]),
                         ))
             await session.commit()
-        workspace_hydrated = True
+        hydrated_tenants.add(tenant_id)
 
 
 app = FastAPI(title="OpsWeave API", version="0.1.0", lifespan=lifespan)
@@ -113,16 +120,88 @@ async def health() -> HealthResponse:
     return HealthResponse(status="ok", environment=settings.environment, aws_configured=bool(settings.artifact_bucket and settings.compilation_queue_url and settings.bedrock_reasoning_model_id and settings.application_table))
 
 
+def _oauth_redirect(screen_hint: str | None = None) -> RedirectResponse:
+    if not settings.cognito_domain or not settings.cognito_client_id:
+        raise HTTPException(status_code=503, detail="Hosted sign-in is not configured")
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+    state = secrets.token_urlsafe(24)
+    query = {
+        "client_id": settings.cognito_client_id,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "redirect_uri": f"{settings.public_app_url}/auth/callback",
+        "state": state,
+        "code_challenge_method": "S256",
+        "code_challenge": challenge,
+    }
+    if screen_hint:
+        query["screen_hint"] = screen_hint
+    response = RedirectResponse(f"https://{settings.cognito_domain}/oauth2/authorize?{urlencode(query)}")
+    secure = settings.environment != "local"
+    response.set_cookie("opsweave_oauth_state", state, max_age=600, httponly=True, secure=secure, samesite="lax")
+    response.set_cookie("opsweave_pkce", verifier, max_age=600, httponly=True, secure=secure, samesite="lax")
+    return response
+
+
+@app.get("/auth/login")
+async def auth_login():
+    return _oauth_redirect()
+
+
+@app.get("/auth/signup")
+async def auth_signup():
+    return _oauth_redirect("signup")
+
+
+@app.get("/auth/callback")
+async def auth_callback(request: Request, code: str, state: str):
+    if state != request.cookies.get("opsweave_oauth_state") or not request.cookies.get("opsweave_pkce"):
+        raise HTTPException(status_code=400, detail="Sign-in state could not be verified")
+    payload = urlencode({
+        "grant_type": "authorization_code",
+        "client_id": settings.cognito_client_id,
+        "code": code,
+        "redirect_uri": f"{settings.public_app_url}/auth/callback",
+        "code_verifier": request.cookies["opsweave_pkce"],
+    }).encode()
+    def exchange() -> dict:
+        token_request = UrlRequest(f"https://{settings.cognito_domain}/oauth2/token", data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
+        with urlopen(token_request, timeout=10) as result:
+            return json.loads(result.read())
+    try:
+        tokens = await asyncio.to_thread(exchange)
+    except Exception as error:
+        raise HTTPException(status_code=401, detail="The authorization code could not be exchanged") from error
+    response = RedirectResponse(f"{settings.public_app_url}/?signed_in=1")
+    response.set_cookie("opsweave_access", tokens["access_token"], max_age=int(tokens.get("expires_in", 3600)), httponly=True, secure=settings.environment != "local", samesite="lax")
+    response.delete_cookie("opsweave_oauth_state")
+    response.delete_cookie("opsweave_pkce")
+    return response
+
+
+@app.get("/auth/logout")
+async def auth_logout():
+    response = RedirectResponse(settings.public_app_url)
+    response.delete_cookie("opsweave_access")
+    return response
+
+
 @app.get("/v1/workspace", response_model=WorkspaceInfoRead)
 async def workspace_info(principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
     tenant = await session.get(Tenant, principal.tenant_id)
     if tenant is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+        if not principal.authenticated:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        tenant = Tenant(id=principal.tenant_id, name=(principal.email or "My").split("@")[0].replace(".", " ").title() + " workspace", slug=f"workspace-{principal.tenant_id[:8]}")
+        session.add(tenant)
+        await session.commit()
+    preferences = await cloud.workspace_preferences(principal.tenant_id)
     return WorkspaceInfoRead(
         tenant_id=tenant.id,
         tenant_name=tenant.name,
         actor_id=principal.actor_id,
-        role="owner",
+        role="owner" if principal.authenticated else "demo guest",
         region=settings.aws_region,
         environment=settings.environment,
         isolation="Dedicated OpsWeave resources",
@@ -130,7 +209,19 @@ async def workspace_info(principal: Principal = Depends(get_principal), session:
         model_alias=settings.bedrock_reasoning_model_id,
         model_calls_configured=bool(settings.model_calls_enabled_parameter),
         max_upload_bytes=settings.max_upload_bytes,
+        preferences=preferences,
     )
+
+
+@app.patch("/v1/workspace/preferences", response_model=WorkspacePreferences)
+async def update_workspace_preferences(payload: WorkspacePreferences, principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
+    if not principal.authenticated:
+        raise HTTPException(status_code=401, detail="Sign in to configure a private workspace")
+    preferences = payload.model_dump()
+    await cloud.put_workspace_preferences(principal.tenant_id, preferences)
+    session.add(AuditEvent(tenant_id=principal.tenant_id, actor_id=principal.actor_id, action="workspace.preferences_updated", resource_type="workspace", resource_id=principal.tenant_id))
+    await session.commit()
+    return payload
 
 
 @app.get("/v1/audit-events", response_model=list[AuditEventRead])
@@ -151,6 +242,7 @@ async def list_audit_events(
 
 @app.get("/v1/projects", response_model=list[ProjectRead])
 async def list_projects(principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
+    await hydrate_workspace(principal.tenant_id)
     rows = await session.execute(
         select(Project, func.count(Artifact.id))
         .outerjoin(Artifact)
@@ -163,8 +255,11 @@ async def list_projects(principal: Principal = Depends(get_principal), session: 
 
 @app.post("/v1/projects", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
 async def create_project(payload: ProjectCreate, principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
+    if not principal.authenticated:
+        raise HTTPException(status_code=401, detail="Sign in to create a private workspace project")
     if await session.get(Tenant, principal.tenant_id) is None:
-        raise HTTPException(status_code=403, detail="Unknown tenant")
+        session.add(Tenant(id=principal.tenant_id, name=(principal.email or "My").split("@")[0].replace(".", " ").title() + " workspace", slug=f"workspace-{principal.tenant_id[:8]}"))
+        await session.flush()
     project = Project(tenant_id=principal.tenant_id, name=payload.name.strip(), description=payload.description.strip())
     session.add(project)
     await session.flush()
@@ -183,6 +278,8 @@ async def list_artifacts(project_id: str, principal: Principal = Depends(get_pri
 
 @app.post("/v1/projects/{project_id}/artifacts", response_model=ArtifactRead, status_code=status.HTTP_201_CREATED)
 async def upload_artifact(project_id: str, upload: UploadFile = File(...), principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
+    if not principal.authenticated:
+        raise HTTPException(status_code=401, detail="Sign in to upload sources to a private workspace")
     project = await session.scalar(select(Project).where(Project.id == project_id, Project.tenant_id == principal.tenant_id))
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -209,6 +306,19 @@ async def upload_artifact(project_id: str, upload: UploadFile = File(...), princ
     await session.refresh(artifact)
     await cloud.put_artifact(artifact)
     return artifact
+
+
+@app.get("/v1/artifacts/{artifact_id}/preview")
+async def preview_artifact(artifact_id: str, principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
+    artifact = await session.scalar(select(Artifact).where(Artifact.id == artifact_id, Artifact.tenant_id == principal.tenant_id))
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    if settings.artifact_bucket and artifact.storage_key.startswith("quarantine/"):
+        return RedirectResponse(storage.presign_get(artifact.storage_key, artifact.filename), status_code=307)
+    path = Path(artifact.storage_key)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Artifact content is unavailable")
+    return FileResponse(path, media_type=artifact.media_type, filename=artifact.filename, content_disposition_type="inline")
 
 
 @app.post("/v1/uploads/presign", response_model=PresignResponse)
@@ -352,6 +462,8 @@ async def create_execution(
     project = await session.scalar(select(Project).where(Project.id == payload.project_id, Project.tenant_id == principal.tenant_id))
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    if not runtime.enabled:
+        raise HTTPException(status_code=409, detail="The Step Functions runtime is not configured")
     try:
         execution = await runtime.start_execution(project.id, payload.workflow_id, principal.tenant_id, payload.claim.model_dump())
     except RuntimeError as error:
@@ -381,6 +493,8 @@ async def get_execution(
     project = await session.scalar(select(Project).where(Project.id == project_id, Project.tenant_id == principal.tenant_id))
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    if not runtime.enabled:
+        raise HTTPException(status_code=409, detail="The Step Functions runtime is not configured")
     try:
         return await runtime.execution_detail(project_id, execution_id, principal.tenant_id)
     except ValueError as error:
@@ -407,6 +521,8 @@ async def decide_approval(
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
 ):
+    if not runtime.enabled:
+        raise HTTPException(status_code=409, detail="The Step Functions runtime is not configured")
     try:
         result = await runtime.decide(payload.project_id, approval_id, principal.tenant_id, payload.decision, principal.actor_id, payload.reason)
     except ValueError as error:
@@ -429,6 +545,8 @@ async def run_evaluation(
     project = await session.scalar(select(Project).where(Project.id == payload.project_id, Project.tenant_id == principal.tenant_id))
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    if not runtime.enabled:
+        raise HTTPException(status_code=409, detail="The Step Functions runtime is not configured")
     try:
         evaluation = await runtime.evaluate(project.id, workflow_id, principal.tenant_id)
     except ValueError as error:

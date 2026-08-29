@@ -80,7 +80,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       OPSWEAVE_ENVIRONMENT                   = var.environment
       OPSWEAVE_DATABASE_URL                  = "sqlite+aiosqlite:////tmp/opsweave.db"
-      OPSWEAVE_CORS_ORIGINS                  = join(",", var.allowed_web_origins)
+      OPSWEAVE_CORS_ORIGINS                  = join(",", local.web_origins)
       OPSWEAVE_ARTIFACT_BUCKET               = aws_s3_bucket.artifacts.id
       OPSWEAVE_COMPILATION_QUEUE_URL         = aws_sqs_queue.compilation.url
       OPSWEAVE_APPLICATION_TABLE             = aws_dynamodb_table.application.name
@@ -90,6 +90,9 @@ resource "aws_lambda_function" "api" {
       OPSWEAVE_MODEL_CALLS_ENABLED_PARAMETER = aws_ssm_parameter.model_calls_enabled.name
       OPSWEAVE_BEDROCK_REASONING_MODEL_ID    = var.bedrock_reasoning_model_id
       OPSWEAVE_CLAIMS_STATE_MACHINE_ARN      = aws_sfn_state_machine.claims.arn
+      OPSWEAVE_COGNITO_DOMAIN                = "${aws_cognito_user_pool_domain.app.domain}.auth.${var.aws_region}.amazoncognito.com"
+      OPSWEAVE_COGNITO_CLIENT_ID             = aws_cognito_user_pool_client.web.id
+      OPSWEAVE_PUBLIC_APP_URL                = local.portal_url
     }
   }
 
@@ -100,7 +103,7 @@ resource "aws_apigatewayv2_api" "api" {
   name          = "${local.name}-api"
   protocol_type = "HTTP"
   cors_configuration {
-    allow_origins  = var.allowed_web_origins
+    allow_origins  = local.web_origins
     allow_methods  = ["GET", "POST", "PATCH", "OPTIONS"]
     allow_headers  = ["authorization", "content-type", "x-actor-id", "x-tenant-id"]
     expose_headers = ["retry-after", "x-ratelimit-limit", "x-ratelimit-remaining"]
@@ -130,6 +133,22 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_burst_limit = 20
     throttling_rate_limit  = 10
   }
+}
+
+resource "aws_apigatewayv2_domain_name" "portal" {
+  domain_name = var.portal_domain_name
+
+  domain_name_configuration {
+    certificate_arn = aws_acm_certificate.portal.arn
+    endpoint_type   = "REGIONAL"
+    security_policy = "TLS_1_2"
+  }
+}
+
+resource "aws_apigatewayv2_api_mapping" "portal" {
+  api_id      = aws_apigatewayv2_api.api.id
+  domain_name = aws_apigatewayv2_domain_name.portal.id
+  stage       = aws_apigatewayv2_stage.default.id
 }
 
 resource "aws_lambda_permission" "api_gateway" {

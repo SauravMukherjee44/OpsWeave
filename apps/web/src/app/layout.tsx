@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: "OpsWeave — Workflow Intelligence",
   description: "Compile fragmented enterprise knowledge into governed, executable workflows.",
+  icons: { icon: "/icon.svg", shortcut: "/icon.svg", apple: "/icon.svg" },
   openGraph: {
     title: "OpsWeave — Workflow Intelligence",
     description: "From fragmented knowledge to governed workflows.",
