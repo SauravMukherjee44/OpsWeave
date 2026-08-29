@@ -1,0 +1,11 @@
+Synthetic employee interview - warehouse claims specialist
+Recorded for the OpsWeave portfolio workspace. No client information is present.
+
+Interviewer: Walk me through a damaged parcel claim.
+Specialist: I first match the order number, shipment event, package label, and claimant identity. I need one photo of the label and one photo of the damaged area. If those are missing, I request them and wait seven days.
+Interviewer: When do you approve a refund?
+Specialist: Our warehouse SOP says I can approve up to 250 dollars when evidence is complete and there is no fraud signal. Above 250 dollars, a warehouse manager approves it.
+Interviewer: Is that the only policy?
+Specialist: Finance recently told us that 200 dollars and above needs finance manager approval. That conflicts with the warehouse threshold, so I send amounts from 200 through 250 to review until the policy owners resolve it.
+Interviewer: What happens when the refund API times out?
+Specialist: Never assume it succeeded. Retry once with the same claim idempotency key, then send it to a person.

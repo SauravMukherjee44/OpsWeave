@@ -1,0 +1,26 @@
+{
+  "retrieved_at": "2026-08-29T00:00:00Z",
+  "sources": [
+    {
+      "publisher": "GS1",
+      "title": "GS1 Logistic Label Guideline, Release 1.3",
+      "url": "https://www.gs1.org/standards/gs1-logistic-label-guideline/1-3",
+      "use": "Public reference for logistic-unit identification, SSCC, barcode and label placement rules",
+      "access": "Linked public source; not copied into the repository"
+    },
+    {
+      "publisher": "UPS",
+      "title": "Supporting Documents for Claims",
+      "url": "https://www.ups.com/us/en/support/file-a-claim/supporting-documents",
+      "use": "Public reference for damaged-item and exterior-package photographic evidence",
+      "access": "Linked public source; not copied into the repository"
+    },
+    {
+      "publisher": "FedEx",
+      "title": "FedEx Service Guide 2026",
+      "url": "https://images.fedex.com/content/dam/fedex/us-united-states/services/Service_Guide_2026.pdf",
+      "use": "Public reference for damage-claim notice, inspection, packaging retention and photographic proof",
+      "access": "Linked public source; not copied into the repository"
+    }
+  ]
+}

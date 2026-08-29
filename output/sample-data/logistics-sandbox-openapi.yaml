@@ -1,0 +1,39 @@
+openapi: 3.1.0
+info:
+  title: OpsWeave Synthetic Logistics Sandbox
+  version: 1.0.0
+paths:
+  /claims/{claimId}:
+    get:
+      operationId: getClaim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Claim record
+  /refunds:
+    post:
+      operationId: issueRefund
+      description: Consequential operation requiring an approved workflow gate and idempotency key.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [claim_id, amount_usd, payment_method]
+              properties:
+                claim_id: { type: string }
+                amount_usd: { type: number, minimum: 0 }
+                payment_method: { type: string, const: original }
+      responses:
+        "202": { description: Refund accepted }
+        "409": { description: Duplicate idempotency key }

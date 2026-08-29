@@ -1,0 +1,7 @@
+claim_id,order_id,shipment_id,claimed_amount_usd,evidence_complete,fraud_signal,outcome,approval_role,processing_minutes
+CLM-1001,ORD-81001,SHP-71001,84.50,true,false,approved,operations_specialist,8
+CLM-1002,ORD-81002,SHP-71002,219.00,true,false,approved,finance_manager,31
+CLM-1003,ORD-81003,SHP-71003,310.75,true,false,approved,warehouse_manager,46
+CLM-1004,ORD-81004,SHP-71004,62.00,false,false,expired,human_review,10080
+CLM-1005,ORD-81005,SHP-71005,145.25,true,true,rejected,fraud_review,93
+CLM-1006,ORD-81006,SHP-71006,199.99,true,false,approved,operations_specialist,12
