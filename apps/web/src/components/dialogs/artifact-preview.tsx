@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Eye, ShieldCheck, X } from "lucide-react";
 import { motion } from "motion/react";
 import { api, type Artifact } from "@/lib/api";
@@ -29,8 +30,12 @@ export function ArtifactPreview({
   artifact: Artifact;
   onClose: () => void;
 }) {
-  const url = api.artifactPreviewUrl(artifact.id);
-  const content = <PreviewMedia artifact={artifact} url={url} />;
+  const preview = useQuery({
+    queryKey: ["artifact-preview", artifact.id],
+    queryFn: () => api.artifactPreview(artifact.id),
+    staleTime: 4 * 60 * 1000,
+  });
+  const url = preview.data?.url;
 
   return (
     <motion.div
@@ -64,7 +69,7 @@ export function ArtifactPreview({
             </small>
           </span>
           <a
-            href={url}
+            href={url ?? api.artifactPreviewUrl(artifact.id)}
             target="_blank"
             rel="noreferrer"
             className="hidden h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-2xs text-accent-fg no-underline hover:border-line-strong sm:flex"
@@ -77,7 +82,22 @@ export function ArtifactPreview({
           </IconButton>
         </header>
 
-        <div className="preview-stage">{content}</div>
+        <div className="preview-stage">
+          {preview.isPending ? (
+            <div className="grid h-full place-items-center text-xs text-muted">Preparing secure preview…</div>
+          ) : preview.isError || !url ? (
+            <div className="grid h-full place-items-center px-6 text-center text-xs text-danger-fg">
+              {preview.error?.message ?? "Preview is unavailable."}
+            </div>
+          ) : preview.data.content !== undefined ? (
+            <div className="h-full overflow-auto bg-white p-5 text-left text-slate-900">
+              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6">{preview.data.content}</pre>
+              {preview.data.truncated ? <p className="mt-4 text-xs text-amber-700">Preview truncated at 512 KB. Open the original to inspect the complete file.</p> : null}
+            </div>
+          ) : (
+            <PreviewMedia artifact={artifact} url={url} />
+          )}
+        </div>
 
         <footer className="flex items-center justify-between gap-3 border-t border-line px-4 text-2xs text-muted">
           <span className="flex items-center gap-1.5">

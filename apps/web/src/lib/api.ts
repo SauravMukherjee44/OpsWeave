@@ -178,6 +178,7 @@ export const api = {
   }),
   artifacts: (projectId: string) => request<Artifact[]>(`/v1/projects/${projectId}/artifacts`),
   artifactPreviewUrl: (artifactId: string) => `${apiBaseUrl()}/v1/artifacts/${artifactId}/preview`,
+  artifactPreview: (artifactId: string) => request<{ url: string; expires_in: number; content?: string; truncated?: boolean }>(`/v1/artifacts/${artifactId}/preview-url`),
   uploadArtifact: (projectId: string, file: File) => {
     const form = new FormData();
     form.append("upload", file);

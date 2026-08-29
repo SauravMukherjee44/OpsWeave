@@ -54,6 +54,7 @@ class CloudRepository:
             items: list[dict[str, Any]] = []
             kwargs: dict[str, Any] = {
                 "KeyConditionExpression": Key("pk").eq(f"TENANT#{tenant_id}") & Key("sk").begins_with("PROJECT#"),
+                "ConsistentRead": True,
             }
             while True:
                 response = self._table().query(**kwargs)
@@ -156,7 +157,10 @@ class CloudRepository:
 
     def _query_project_items(self, project_id: str) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
-        kwargs: dict[str, Any] = {"KeyConditionExpression": Key("pk").eq(f"PROJECT#{project_id}")}
+        kwargs: dict[str, Any] = {
+            "KeyConditionExpression": Key("pk").eq(f"PROJECT#{project_id}"),
+            "ConsistentRead": True,
+        }
         while True:
             response = self._table().query(**kwargs)
             items.extend(response.get("Items", []))
