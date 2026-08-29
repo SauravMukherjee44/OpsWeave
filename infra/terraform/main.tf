@@ -154,7 +154,7 @@ resource "aws_cognito_user_pool_client" "web" {
   supported_identity_providers         = ["COGNITO"]
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["email", "openid", "profile"]
+  allowed_oauth_scopes                 = ["aws.cognito.signin.user.admin", "email", "openid", "profile"]
   callback_urls = [
     "${local.portal_url}/auth/callback",
     "${aws_apigatewayv2_api.api.api_endpoint}/auth/callback",

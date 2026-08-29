@@ -159,8 +159,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const detail = body?.detail;
     const message = typeof detail === "string" ? detail : detail?.message ?? `Request failed (${response.status})`;
-    const error = new Error(message) as Error & { blockers?: string[] };
+    const error = new Error(message) as Error & { blockers?: string[]; status?: number };
     error.blockers = detail?.blockers;
+    error.status = response.status;
     throw error;
   }
   return body as T;
