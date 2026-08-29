@@ -44,6 +44,49 @@ const formatBytes = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+function PortalPreloader() {
+  const [phase, setPhase] = useState(0);
+  const phases = [
+    "Waking the secure workspace",
+    "Connecting evidence and workflow services",
+    "Restoring your live operational context",
+  ];
+
+  useEffect(() => {
+    const timers = [
+      window.setTimeout(() => setPhase(1), 1_200),
+      window.setTimeout(() => setPhase(2), 3_200),
+    ];
+    return () => timers.forEach(window.clearTimeout);
+  }, []);
+
+  return (
+    <main className="portal-preloader" role="status" aria-live="polite" aria-label="Loading OpsWeave">
+      <div className="preloader-grid" aria-hidden="true" />
+      <div className="preloader-aura" aria-hidden="true" />
+      <section className="preloader-content">
+        <div className="preloader-mark" aria-hidden="true">
+          <span className="preloader-orbit orbit-blue"><FileText /></span>
+          <span className="preloader-orbit orbit-red"><FileImage /></span>
+          <span className="preloader-orbit orbit-yellow"><FileAudio /></span>
+          <span className="preloader-orbit orbit-green"><ShieldCheck /></span>
+          <div className="preloader-core"><span /><span /><span /><span /></div>
+          <i className="preloader-ring ring-one" />
+          <i className="preloader-ring ring-two" />
+        </div>
+        <div className="preloader-brand"><strong>OpsWeave</strong><span>Evidence to governed execution</span></div>
+        <div className="preloader-progress" aria-hidden="true"><span /></div>
+        <AnimatePresence mode="wait">
+          <motion.p key={phase} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .2 }}>
+            {phases[phase]}<span className="loading-dots"><i /><i /><i /></span>
+          </motion.p>
+        </AnimatePresence>
+        <small>Serverless resources may take a moment after inactivity.</small>
+      </section>
+    </main>
+  );
+}
+
 export default function Home() {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -74,10 +117,10 @@ export default function Home() {
     window.localStorage.setItem("opsweave-theme", next);
   };
 
-  const health = useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 30_000 });
-  const workspaceInfo = useQuery({ queryKey: ["workspace-info"], queryFn: api.workspaceInfo });
-  const auditEvents = useQuery({ queryKey: ["audit-events"], queryFn: api.auditEvents, refetchInterval: 20_000 });
-  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
+  const health = useQuery({ queryKey: ["health"], queryFn: api.health, retry: 3, retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 3_000), refetchInterval: 30_000 });
+  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects, enabled: health.isSuccess, retry: 2 });
+  const workspaceInfo = useQuery({ queryKey: ["workspace-info"], queryFn: api.workspaceInfo, enabled: projects.isSuccess });
+  const auditEvents = useQuery({ queryKey: ["audit-events"], queryFn: api.auditEvents, enabled: projects.isSuccess, refetchInterval: 20_000 });
 
   const activeProjectId = selectedProjectId ?? projects.data?.[0]?.id ?? null;
 
@@ -165,6 +208,10 @@ export default function Home() {
   const cloudStatus = new Map((workspace.data?.artifacts ?? []).map((artifact) => [artifact.artifact_id, artifact.status]));
   const latestCompilation = workspace.data?.compilations[0];
   const heading = surfaceCopy[surface];
+  const isBootstrapping = health.isPending || (health.isSuccess && projects.isPending);
+  const bootstrapFailed = health.isError || projects.isError;
+
+  if (isBootstrapping) return <PortalPreloader />;
 
   return (
     <main className="product-shell">
@@ -226,8 +273,12 @@ export default function Home() {
             {selectedProject && <button className="project-pill"><span className="project-color" />{selectedProject.name}<ChevronDown size={15} /></button>}
           </section>
 
-          {!backendOnline && (
-            <div className="system-banner error"><CircleAlert size={19} /><span><strong>The portal cannot reach the API.</strong> Start the backend service at <code>localhost:8000</code>. No placeholder data is being shown.</span></div>
+          {bootstrapFailed && (
+            <div className="system-banner error">
+              <CircleAlert size={19} />
+              <span><strong>OpsWeave could not finish loading.</strong> The live workspace did not respond after several attempts. No placeholder data is being shown.</span>
+              <button onClick={() => void health.refetch().then((result) => { if (result.isSuccess) void projects.refetch(); })}>Try again</button>
+            </div>
           )}
 
           {backendOnline && projects.data?.length === 0 && (

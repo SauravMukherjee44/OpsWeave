@@ -56,6 +56,10 @@ data "aws_iam_policy_document" "api" {
     actions   = ["ssm:GetParameter"]
     resources = [aws_ssm_parameter.model_calls_enabled.arn]
   }
+  statement {
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey"]
+    resources = [aws_kms_key.app.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "api" {

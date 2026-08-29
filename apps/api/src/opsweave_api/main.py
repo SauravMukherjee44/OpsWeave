@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import asyncio
+import logging
 from pathlib import Path
 import uuid
 
@@ -31,6 +33,9 @@ storage = ArtifactStorage(settings)
 compilation_queue = CompilationQueue(settings)
 cloud = CloudRepository(settings)
 runtime = RuntimeService(settings)
+logger = logging.getLogger("opsweave.api")
+workspace_hydration_lock = asyncio.Lock()
+workspace_hydrated = False
 
 
 @asynccontextmanager
@@ -42,7 +47,19 @@ async def lifespan(_: FastAPI):
         if tenant is None:
             session.add(Tenant(id=settings.demo_tenant_id, name="OpsWeave guided workspace", slug="guided-demo"))
             await session.flush()
-        if settings.environment != "local" and cloud.enabled:
+        await session.commit()
+    yield
+
+
+async def hydrate_workspace() -> None:
+    """Hydrate cloud state only for API requests, never for static asset requests."""
+    global workspace_hydrated
+    if workspace_hydrated or settings.environment == "local" or not cloud.enabled:
+        return
+    async with workspace_hydration_lock:
+        if workspace_hydrated:
+            return
+        async with SessionFactory() as session:
             for remote_project in await cloud.tenant_projects(settings.demo_tenant_id):
                 project_id = remote_project["project_id"]
                 if await session.get(Project, project_id) is None:
@@ -63,8 +80,8 @@ async def lifespan(_: FastAPI):
                             storage_key=item["storage_key"], checksum_sha256=item["checksum_sha256"],
                             status=item.get("status", "stored"), created_at=datetime.fromisoformat(item["created_at"]),
                         ))
-        await session.commit()
-    yield
+            await session.commit()
+        workspace_hydrated = True
 
 
 app = FastAPI(title="OpsWeave API", version="0.1.0", lifespan=lifespan)
@@ -82,6 +99,13 @@ async def security_headers(request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=()"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
+
+
+@app.middleware("http")
+async def hydrate_api_workspace(request, call_next):
+    if request.url.path.startswith("/v1"):
+        await hydrate_workspace()
+    return await call_next(request)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -237,8 +261,12 @@ async def start_compilation(project_id: str, principal: Principal = Depends(get_
     except Exception as error:
         job.status = CompilationStatus.FAILED
         job.error_message = "Unable to hand the compilation to the AWS worker"
+        project.status = ProjectStatus.FAILED
         session.add(AuditEvent(tenant_id=principal.tenant_id, actor_id=principal.actor_id, action="compilation.enqueue_failed", resource_type="compilation", resource_id=job.id))
         await session.commit()
+        await cloud.put_compilation(job)
+        await cloud.put_project(project)
+        logger.exception("Compilation enqueue failed for job %s", job.id)
         raise HTTPException(status_code=502, detail=job.error_message) from error
 
     job.status = CompilationStatus.QUEUED
