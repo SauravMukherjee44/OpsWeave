@@ -351,6 +351,39 @@ resource "aws_ecr_repository" "api" {
   }
 }
 
+# Keep one deployed image and one rollback image. This prevents stale OpsWeave
+# container releases from accumulating in the project's dedicated repository.
+resource "aws_ecr_lifecycle_policy" "api" {
+  repository = aws_ecr_repository.api.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Expire untagged OpsWeave API images after one day"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Retain only the two newest hosted API releases"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["hosted-v"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 2
+        }
+        action = { type = "expire" }
+      },
+    ]
+  })
+}
+
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/opsweave/${var.environment}/api"
   retention_in_days = var.environment == "prod" ? 90 : 14

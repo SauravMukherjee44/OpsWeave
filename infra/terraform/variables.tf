@@ -69,5 +69,5 @@ variable "bda_project_arn" {
 variable "api_image_tag" {
   type        = string
   description = "Immutable ECR image tag deployed to the hosted OpsWeave API"
-  default     = "hosted-v8"
+  default     = "hosted-v9"
 }
