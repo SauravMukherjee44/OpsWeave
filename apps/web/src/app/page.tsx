@@ -26,6 +26,8 @@ import { WorkflowStudio } from "@/components/surfaces/workflow-studio";
 import { ArtifactPreview } from "@/components/dialogs/artifact-preview";
 import { AuthDialog } from "@/components/dialogs/auth-dialog";
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog";
+import { HelpCenter } from "@/components/dialogs/help-center";
+import { NotificationCenter } from "@/components/dialogs/notification-center";
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -41,6 +43,17 @@ export default function Home() {
   const [projectDescription, setProjectDescription] = useState("");
   const [compileError, setCompileError] = useState<string[]>([]);
   const [previewArtifact, setPreviewArtifact] = useState<Artifact | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = JSON.parse(window.localStorage.getItem("opsweave-read-notifications") ?? "[]");
+      return new Set(Array.isArray(stored) ? stored.filter(item => typeof item === "string") : []);
+    } catch {
+      return new Set();
+    }
+  });
 
   useEffect(() => {
     const stored = window.localStorage.getItem("opsweave-theme");
@@ -209,6 +222,16 @@ export default function Home() {
     setNavOpen(false);
   };
 
+  const persistReadNotifications = (ids: Set<string>) => {
+    setReadNotificationIds(ids);
+    window.localStorage.setItem("opsweave-read-notifications", JSON.stringify([...ids]));
+  };
+  const notificationIds = [
+    ...(approvals.data ?? []).filter(item => item.status === "pending").map(item => `approval-${item.approval_id}`),
+    ...(auditEvents.data ?? []).slice(0, 30).map(item => `event-${item.id}`),
+  ];
+  const unreadNotifications = notificationIds.filter(id => !readNotificationIds.has(id)).length;
+
   if (isBootstrapping) return <PortalPreloader />;
 
   return (
@@ -234,8 +257,6 @@ export default function Home() {
         }}
         workspaceName={workspaceInfo.data?.tenant_name ?? "My workspace"}
         isGuest={isGuest}
-        backendOnline={backendOnline}
-        environment={health.data?.environment}
         onSelect={goTo}
         onSignIn={requestPrivateWorkspace}
         open={navOpen}
@@ -250,6 +271,9 @@ export default function Home() {
           onCreate={requestCreate}
           onSignIn={requestPrivateWorkspace}
           onOpenNav={() => setNavOpen(true)}
+          onOpenHelp={() => setShowHelp(true)}
+          onOpenNotifications={() => setShowNotifications(true)}
+          unreadNotifications={unreadNotifications}
         />
 
         <div className="mx-auto max-w-[1460px] px-4 pt-9 pb-16 sm:px-7">
@@ -474,6 +498,24 @@ export default function Home() {
       </AnimatePresence>
 
       <AnimatePresence>{showAuth ? <AuthDialog onClose={() => setShowAuth(false)} /> : null}</AnimatePresence>
+
+      <AnimatePresence>
+        {showHelp ? <HelpCenter onClose={() => setShowHelp(false)} onNavigate={goTo} /> : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showNotifications ? (
+          <NotificationCenter
+            auditEvents={auditEvents.data ?? []}
+            approvals={approvals.data ?? []}
+            readIds={readNotificationIds}
+            onRead={(id) => persistReadNotifications(new Set([...readNotificationIds, id]))}
+            onReadAll={(ids) => persistReadNotifications(new Set([...readNotificationIds, ...ids]))}
+            onClose={() => setShowNotifications(false)}
+            onNavigate={goTo}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {previewArtifact ? (

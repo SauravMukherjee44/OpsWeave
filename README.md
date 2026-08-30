@@ -336,8 +336,8 @@ docker build \
   --provenance=false \
   --sbom=false \
   -f apps/api/Dockerfile.lambda \
-  -t "$ECR_REPOSITORY:hosted-v18" .
-docker push "$ECR_REPOSITORY:hosted-v18"
+  -t "$ECR_REPOSITORY:hosted-v19" .
+docker push "$ECR_REPOSITORY:hosted-v19"
 ```
 
 Then set `api_image_tag` to that immutable tag and apply Terraform. The Lambda container serves both the static portal and API from one HTTPS API Gateway origin, avoiding an always-on web server.

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Cloud, CloudOff, LogIn, MoreHorizontal, X } from "lucide-react";
+import { ChevronDown, LogIn, MoreHorizontal, X } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { NAV_GROUPS, type CountKey, type Surface } from "@/lib/surfaces";
@@ -11,8 +11,6 @@ export function SideNav({
   counts,
   workspaceName,
   isGuest,
-  backendOnline,
-  environment,
   onSelect,
   onSignIn,
   open,
@@ -22,8 +20,6 @@ export function SideNav({
   counts: Record<CountKey, number>;
   workspaceName: string;
   isGuest: boolean;
-  backendOnline: boolean;
-  environment?: string;
   onSelect: (surface: Surface) => void;
   onSignIn: () => void;
   open: boolean;
@@ -126,22 +122,6 @@ export function SideNav({
         </nav>
 
         <div className="mt-4 shrink-0">
-          <div className="mx-1 mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-surface p-2.5">
-            {backendOnline ? (
-              <Cloud size={15} className="shrink-0 text-success-fg" />
-            ) : (
-              <CloudOff size={15} className="shrink-0 text-danger-fg" />
-            )}
-            <span className="min-w-0">
-              <strong className="block truncate text-2xs font-semibold text-content">
-                {backendOnline ? "API connected" : "API unavailable"}
-              </strong>
-              <small className="block truncate text-2xs text-muted">
-                {backendOnline ? environment : "Start the OpsWeave API"}
-              </small>
-            </span>
-          </div>
-
           {isGuest ? (
             <button
               onClick={onSignIn}
