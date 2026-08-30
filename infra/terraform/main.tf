@@ -70,10 +70,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
   bucket = aws_s3_bucket.artifacts.id
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.app.arn
-      sse_algorithm     = "aws:kms"
+      sse_algorithm = "AES256"
     }
-    bucket_key_enabled = true
   }
 }
 
@@ -110,14 +108,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
 resource "aws_sqs_queue" "compilation_dlq" {
   name                      = "${local.name}-compilation-dlq"
   message_retention_seconds = 1209600
-  kms_master_key_id         = aws_kms_key.app.arn
+  sqs_managed_sse_enabled   = true
 }
 
 resource "aws_sqs_queue" "compilation" {
   name                       = "${local.name}-compilation"
   visibility_timeout_seconds = 900
   message_retention_seconds  = 345600
-  kms_master_key_id          = aws_kms_key.app.arn
+  sqs_managed_sse_enabled    = true
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.compilation_dlq.arn
     maxReceiveCount     = 3
@@ -308,7 +306,7 @@ resource "aws_dynamodb_table" "application" {
     enabled = true
   }
   server_side_encryption {
-    enabled = true
+    enabled = false
   }
   ttl {
     attribute_name = "expires_at"
@@ -325,7 +323,7 @@ resource "aws_dynamodb_table" "quotas" {
     type = "S"
   }
   server_side_encryption {
-    enabled = true
+    enabled = false
   }
   ttl {
     attribute_name = "expires_at"
@@ -387,7 +385,6 @@ resource "aws_ecr_lifecycle_policy" "api" {
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/opsweave/${var.environment}/api"
   retention_in_days = var.environment == "prod" ? 90 : 14
-  kms_key_id        = aws_kms_key.app.arn
 }
 
 resource "aws_budgets_budget" "monthly" {

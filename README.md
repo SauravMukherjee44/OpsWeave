@@ -286,7 +286,7 @@ terraform -chdir=infra/terraform fmt -check -recursive
 terraform -chdir=infra/terraform validate
 ```
 
-Current API suite: **22 passing tests**.
+Current API suite: **24 passing tests**.
 
 The security boundary includes:
 
@@ -336,8 +336,8 @@ docker build \
   --provenance=false \
   --sbom=false \
   -f apps/api/Dockerfile.lambda \
-  -t "$ECR_REPOSITORY:hosted-v22" .
-docker push "$ECR_REPOSITORY:hosted-v22"
+  -t "$ECR_REPOSITORY:hosted-v25" .
+docker push "$ECR_REPOSITORY:hosted-v25"
 ```
 
 Then set `api_image_tag` to that immutable tag and apply Terraform. The Lambda container serves both the static portal and API from one HTTPS API Gateway origin, avoiding an always-on web server.
@@ -347,16 +347,18 @@ Then set `api_image_tag` to that immutable tag and apply Terraform. The Lambda c
 The demo architecture is deliberately scale-to-zero or pay-per-request:
 
 - Lambda container API and workers;
-- DynamoDB on-demand tables;
-- SQS with bounded worker concurrency;
-- S3 lifecycle controls;
-- short development log retention;
-- API throttling and application rate limits;
-- disabled relational database by default;
-- SSM model-call kill switch;
-- tagged monthly AWS Budget alerts.
+- DynamoDB with AWS-owned encryption and one durable quota write per normal read;
+- SQS managed encryption with bounded worker concurrency;
+- S3 AES-256 encryption and lifecycle controls;
+- no idle browser polling: refreshes run only while a user-started compilation or execution is active;
+- a Bedrock status rule that enables only while ingestion work is pending;
+- API Gateway throttling at 10 requests/second with a burst of 20;
+- a 30,000-request global daily circuit breaker, keeping normal API traffic below roughly 900,000 requests/month;
+- global daily action caps of 30 uploads, 8 compilations, 50 executions, 20 evaluations, and 500 artifact previews;
+- short development log retention, a disabled-by-default relational database, and an SSM model-call kill switch;
+- a $20 OpsWeave budget plus a separate $40 account budget, using the activated `Application` cost-allocation tag.
 
-An AWS Budget is an alerting boundary, not a hard service cutoff. Review Cost Explorer and CloudWatch regularly for a public demo.
+AWS Budgets send alerts; they do not stop services. OpsWeave therefore enforces its request and expensive-action ceilings in the API as operational circuit breakers. Free-tier allowances are account-level and can change, so the project dashboard and Cost Explorer remain the source of truth for spend shared across the account.
 
 ## Release gates
 

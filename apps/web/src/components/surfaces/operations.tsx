@@ -45,7 +45,10 @@ export function OperationsSurface({
     queryKey: ["execution-detail", projectId, activeExecutionId],
     queryFn: () => api.execution(projectId, activeExecutionId!),
     enabled: Boolean(activeExecutionId),
-    refetchInterval: 5_000,
+    refetchInterval: (query) => {
+      const current = query.state.data;
+      return current && ["starting", "running", "waiting_for_approval"].includes(current.status) ? 5_000 : false;
+    },
   });
 
   if (!workflow || workflow.status !== "published") {

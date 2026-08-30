@@ -16,7 +16,6 @@ TABLE_NAME = os.environ["APPLICATION_TABLE"]
 BUCKET = os.environ["ARTIFACT_BUCKET"]
 BDA_PROJECT_ARN = os.environ["BDA_PROJECT_ARN"]
 BDA_PROFILE_ARN = os.environ["BDA_PROFILE_ARN"]
-KMS_KEY_ARN = os.environ["KMS_KEY_ARN"]
 KILL_SWITCH = os.environ["MODEL_CALLS_ENABLED_PARAMETER"]
 MODEL_ID = os.environ.get("BEDROCK_REASONING_MODEL_ID", "us.openai.gpt-5.6-luna")
 
@@ -26,6 +25,8 @@ bda = boto3.client("bedrock-data-automation-runtime", region_name=REGION)
 bedrock = boto3.client("bedrock-runtime", region_name=REGION)
 s3 = boto3.client("s3", region_name=REGION)
 ssm = boto3.client("ssm", region_name=REGION)
+events = boto3.client("events", region_name=REGION)
+STATUS_RULE_NAME = os.environ.get("STATUS_RULE_NAME")
 
 ALLOWED_NODE_TYPES = {
     "trigger", "extract", "retrieve", "rule", "agent", "transform",
@@ -198,7 +199,6 @@ def start_compilation(message: dict[str, Any]) -> None:
             inputConfiguration={"s3Uri": f"s3://{BUCKET}/{artifact['storage_key']}"},
             outputConfiguration={"s3Uri": f"s3://{BUCKET}/{output_prefix}"},
             dataAutomationConfiguration={"dataAutomationProjectArn": BDA_PROJECT_ARN, "stage": "LIVE"},
-            encryptionConfiguration={"kmsKeyId": KMS_KEY_ARN},
             notificationConfiguration={"eventBridgeConfiguration": {"eventBridgeEnabled": True}},
             dataAutomationProfileArn=BDA_PROFILE_ARN,
             tags=[{"key": "Application", "value": "OpsWeave"}, {"key": "Tenant", "value": tenant_id}],
@@ -220,18 +220,26 @@ def start_compilation(message: dict[str, Any]) -> None:
         pending += 1
 
     update_compilation(project_id, job_id, status="ingesting", progress=15 if pending else 55)
+    if pending and STATUS_RULE_NAME:
+        events.enable_rule(Name=STATUS_RULE_NAME)
     if not pending:
         advance_compilation(project_id, job_id)
 
 
 def status_handler(_event, _context):
     if not model_calls_enabled():
+        if STATUS_RULE_NAME:
+            events.disable_rule(Name=STATUS_RULE_NAME)
         return {"checked": 0, "disabled": True}
     processing = table.query(
         IndexName="gsi1",
         KeyConditionExpression=Key("gsi1pk").eq("BDA#PROCESSING"),
         Limit=20,
     ).get("Items", [])
+    if not processing:
+        if STATUS_RULE_NAME:
+            events.disable_rule(Name=STATUS_RULE_NAME)
+        return {"checked": 0, "idle": True}
     checked = 0
     touched_jobs: set[tuple[str, str]] = set()
     for artifact in processing:
@@ -279,6 +287,15 @@ def status_handler(_event, _context):
             advance_compilation(project_id, job_id)
         except Exception as error:
             mark_compilation_failed(project_id, job_id, str(error))
+
+    remaining = table.query(
+        IndexName="gsi1",
+        KeyConditionExpression=Key("gsi1pk").eq("BDA#PROCESSING"),
+        Select="COUNT",
+        Limit=1,
+    ).get("Count", 0)
+    if not remaining and STATUS_RULE_NAME:
+        events.disable_rule(Name=STATUS_RULE_NAME)
     return {"checked": checked, "advanced": len(touched_jobs)}
 
 
