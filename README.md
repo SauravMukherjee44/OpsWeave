@@ -243,7 +243,7 @@ Useful metrics include process-rule extraction F1, conflict recall, graph-edit d
 
 ### Prerequisites
 
-- Node.js 20.9+
+- Node.js 22.13+ (Node.js 24 recommended)
 - pnpm 11+
 - Python 3.12
 - Docker Desktop for container and integration checks
