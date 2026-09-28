@@ -1,0 +1,10 @@
+environment               = "dev"
+aws_profile               = "opsweave"
+aws_account_id            = "123456789012"
+aws_region                = "us-east-1"
+monthly_budget_usd        = 20
+budget_notification_email = "you@example.com"
+allowed_web_origins       = ["http://localhost:3000"]
+enable_relational_database = false
+bedrock_reasoning_model_id  = "us.openai.gpt-5.6-luna"
+bda_project_arn             = "arn:aws:bedrock:us-east-1:123456789012:data-automation-project/replace-me"

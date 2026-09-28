@@ -1,0 +1,14 @@
+{
+  "claim_id": "CLM-LIVE-2048",
+  "order_id": "ORD-92048",
+  "shipment_id": "SHP-82048",
+  "claimed_amount_usd": 225.0,
+  "reason": "crushed_corner_and_water_damage",
+  "evidence": {
+    "label_photo_received": true,
+    "damage_photo_received": true,
+    "shipment_event_matched": true
+  },
+  "fraud_indicators": [],
+  "requested_resolution": "refund_original_payment_method"
+}

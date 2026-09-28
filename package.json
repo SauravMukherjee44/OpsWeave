@@ -1,0 +1,20 @@
+{
+  "name": "opsweave",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c blue,green 'pnpm --filter web dev' '.venv/bin/uvicorn opsweave_api.main:app --reload --port 8000'",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": ".venv/bin/uvicorn opsweave_api.main:app --reload --port 8000",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test && .venv/bin/pytest apps/api",
+    "web": "pnpm --filter web dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "turbo": "^2.8.17"
+  }
+}
