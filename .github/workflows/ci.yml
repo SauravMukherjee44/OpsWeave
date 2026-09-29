@@ -21,8 +21,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web lint
-      - run: pnpm --filter web typecheck
       - run: pnpm --filter web build
+      - run: pnpm --filter web typecheck
 
   api:
     runs-on: ubuntu-latest
