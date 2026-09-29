@@ -24,6 +24,19 @@ class ArtifactStorage:
             ExpiresIn=900,
         )
 
+    def presign_get(self, key: str, filename: str) -> str:
+        if not self.settings.artifact_bucket:
+            raise RuntimeError("S3 artifact bucket is not configured")
+        return boto3.client("s3", region_name=self.settings.aws_region).generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": self.settings.artifact_bucket,
+                "Key": key,
+                "ResponseContentDisposition": f'inline; filename="{filename.replace(chr(34), "")}"',
+            },
+            ExpiresIn=300,
+        )
+
     async def save_local(self, key: str, file: BinaryIO) -> tuple[Path, int, str]:
         destination = self.settings.local_upload_dir / key
         destination.parent.mkdir(parents=True, exist_ok=True)

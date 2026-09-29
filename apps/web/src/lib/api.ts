@@ -106,6 +106,7 @@ export type WorkspaceInfo = {
   model_alias: string | null;
   model_calls_configured: boolean;
   max_upload_bytes: number;
+  preferences: { timezone?: string; notifications?: string; retention?: string; review_threshold?: string };
 };
 export type Execution = {
   execution_id: string;
@@ -153,7 +154,7 @@ function apiBaseUrl() {
 const headers = { "X-Tenant-Id": LOCAL_TENANT_ID, "X-Actor-Id": "local-owner" };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBaseUrl()}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
+  const response = await fetch(`${apiBaseUrl()}${path}`, { ...init, credentials: "include", headers: { ...headers, ...init?.headers } });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = body?.detail;
@@ -168,12 +169,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<Health>("/health"),
   workspaceInfo: () => request<WorkspaceInfo>("/v1/workspace"),
+  updatePreferences: (payload: { timezone: string; notifications: string; retention: string; review_threshold: string }) => request("/v1/workspace/preferences", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }),
   auditEvents: () => request<AuditEvent[]>("/v1/audit-events?limit=100"),
   projects: () => request<Project[]>("/v1/projects"),
   createProject: (payload: { name: string; description: string }) => request<Project>("/v1/projects", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
   }),
   artifacts: (projectId: string) => request<Artifact[]>(`/v1/projects/${projectId}/artifacts`),
+  artifactPreviewUrl: (artifactId: string) => `${apiBaseUrl()}/v1/artifacts/${artifactId}/preview`,
   uploadArtifact: (projectId: string, file: File) => {
     const form = new FormData();
     form.append("upload", file);

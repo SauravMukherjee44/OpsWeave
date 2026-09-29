@@ -1,0 +1,296 @@
+/* ==========================================================================
+   OpsWeave design tokens
+   --------------------------------------------------------------------------
+   Layer 1  theme-aware raw values      :root[data-theme]
+   Layer 2  static scales               @theme
+   Layer 3  theme-following utilities   @theme inline
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Layer 1 — theme-aware surfaces, text, and semantic tints
+   -------------------------------------------------------------------------- */
+
+:root,
+:root[data-theme="dark"] {
+  --bg: #0a0810;
+  --bg-elevated: #100c18;
+  --nav: rgba(16, 12, 24, .92);
+  --surface: #17131f;
+  --surface-2: #1e1829;
+  --surface-3: #281f36;
+  --surface-hover: #221b2f;
+
+  --border: #322942;
+  --border-strong: #453a58;
+  --border-accent: color-mix(in srgb, var(--brand-violet) 42%, transparent);
+
+  --text: #f4f2f8;
+  --text-2: #c8c3d4;
+  --muted: #a49db5;
+  /* Lightened from #6f6982: the old value sat near 3.4:1 on --surface, which
+     fails WCAG AA for the small label text this token is used for. */
+  --faint: #8a8399;
+
+  --overlay: rgba(6, 4, 10, .74);
+  --grid: #342b45;
+  --minimap-mask: rgba(10, 8, 16, .72);
+
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, .3);
+  --elevation-2: 0 8px 24px rgba(0, 0, 0, .28);
+  --elevation-3: 0 18px 52px rgba(0, 0, 0, .34);
+  --elevation-glow: 0 12px 40px color-mix(in srgb, var(--brand-violet) 22%, transparent);
+  --shadow: var(--elevation-3);
+
+  /* Semantic tints resolved per theme so components never hand-mix colors. */
+  --success-fg: #3ad693;
+  --success-bg: color-mix(in srgb, var(--success) 14%, var(--surface));
+  --success-border: color-mix(in srgb, var(--success) 34%, var(--border));
+
+  --warning-fg: #ffc247;
+  --warning-bg: color-mix(in srgb, var(--warning) 14%, var(--surface));
+  --warning-border: color-mix(in srgb, var(--warning) 34%, var(--border));
+
+  --danger-fg: #ff7a70;
+  --danger-bg: color-mix(in srgb, var(--danger) 13%, var(--surface));
+  --danger-border: color-mix(in srgb, var(--danger) 34%, var(--border));
+
+  --info-fg: #7fb4ff;
+  --info-bg: color-mix(in srgb, var(--info) 14%, var(--surface));
+  --info-border: color-mix(in srgb, var(--info) 34%, var(--border));
+
+  --accent-fg: #c98bff;
+  --accent-bg: color-mix(in srgb, var(--brand-violet) 15%, var(--surface));
+  --accent-border: color-mix(in srgb, var(--brand-violet) 36%, var(--border));
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f6fb;
+  --bg-elevated: #ffffff;
+  --nav: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f6fb;
+  --surface-3: #eeecf5;
+  --surface-hover: #f2f0f9;
+
+  --border: #e3e0ec;
+  --border-strong: #c9c4d6;
+  --border-accent: color-mix(in srgb, var(--brand-violet) 34%, transparent);
+
+  --text: #1a1626;
+  --text-2: #3d3752;
+  --muted: #605a73;
+  --faint: #6f6880;
+
+  --overlay: rgba(26, 22, 38, .4);
+  --grid: #dcd8e8;
+  --minimap-mask: rgba(247, 246, 251, .78);
+
+  --elevation-1: 0 1px 2px rgba(26, 22, 38, .06);
+  --elevation-2: 0 8px 24px rgba(26, 22, 38, .08);
+  --elevation-3: 0 18px 52px rgba(26, 22, 38, .12);
+  --elevation-glow: 0 12px 40px color-mix(in srgb, var(--brand-violet) 18%, transparent);
+  --shadow: var(--elevation-3);
+
+  --success-fg: #0f8a5f;
+  --success-bg: color-mix(in srgb, var(--success) 12%, var(--surface));
+  --success-border: color-mix(in srgb, var(--success) 30%, var(--border));
+
+  --warning-fg: #a86a00;
+  --warning-bg: color-mix(in srgb, var(--warning) 15%, var(--surface));
+  --warning-border: color-mix(in srgb, var(--warning) 32%, var(--border));
+
+  --danger-fg: #c9342a;
+  --danger-bg: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  --danger-border: color-mix(in srgb, var(--danger) 28%, var(--border));
+
+  --info-fg: #1c62c4;
+  --info-bg: color-mix(in srgb, var(--info) 12%, var(--surface));
+  --info-border: color-mix(in srgb, var(--info) 28%, var(--border));
+
+  --accent-fg: #7b2fd4;
+  --accent-bg: color-mix(in srgb, var(--brand-violet) 11%, var(--surface));
+  --accent-border: color-mix(in srgb, var(--brand-violet) 30%, var(--border));
+
+  color-scheme: light;
+}
+
+/* --------------------------------------------------------------------------
+   Brand ramp and gradients — identical across themes
+   -------------------------------------------------------------------------- */
+
+:root {
+  --brand-coral: #ff6b4a;
+  --brand-rose: #ef4773;
+  --brand-violet: #b45cff;
+
+  --success: #2fbf82;
+  --warning: #f5a524;
+  --danger: #f4544a;
+  --info: #4d9dff;
+
+  /* The signature gradient: promoted from a one-off button style to the
+     primary brand expression across CTAs, the logo, and active nav. */
+  --gradient-brand: linear-gradient(110deg, var(--brand-coral), var(--brand-rose) 48%, var(--brand-violet));
+  --gradient-brand-soft: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-coral) 18%, var(--surface)),
+    color-mix(in srgb, var(--brand-violet) 18%, var(--surface))
+  );
+  --gradient-primary: linear-gradient(110deg, var(--primary-500), var(--brand-violet));
+  --gradient-surface: linear-gradient(150deg, color-mix(in srgb, var(--surface) 94%, var(--brand-violet)), var(--surface));
+  --gradient-mesh:
+    radial-gradient(circle at 8% -4%, color-mix(in srgb, var(--brand-coral) 12%, transparent), transparent 34%),
+    radial-gradient(circle at 92% 6%, color-mix(in srgb, var(--brand-violet) 14%, transparent), transparent 38%),
+    radial-gradient(circle at 48% 104%, color-mix(in srgb, var(--primary-500) 10%, transparent), transparent 44%);
+
+  /* Interactive primary: violet-indigo replaces the former Google blue. */
+  --primary-50: #f4f1fe;
+  --primary-100: #e9e2fd;
+  --primary-200: #d4c8fb;
+  --primary-300: #b7a2f7;
+  --primary-400: #9878f1;
+  --primary-500: #7c5ce7;
+  --primary-600: #6845d3;
+  --primary-700: #5636af;
+  --primary-800: #472f8e;
+  --primary-900: #3b2a72;
+
+  /* Legacy aliases. Existing surface CSS still reads these names, so remapping
+     them here re-skins un-migrated surfaces instead of leaving them stranded
+     on the old Google palette mid-migration. */
+  --blue: var(--primary-500);
+  --blue-soft: var(--primary-100);
+  --purple: var(--brand-violet);
+  --purple-soft: #ecdcff;
+  --coral: var(--brand-coral);
+  --cyan: #38d6da;
+  --green: var(--success);
+  --green-soft: #d5f5e6;
+  --yellow: var(--warning);
+  --yellow-soft: #ffeecb;
+  --red: var(--danger);
+  --red-soft: #ffe1de;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 2 — static scales exposed as Tailwind utilities
+   -------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* Type scale. 11px is a hard floor: the previous 7-9px labels failed the
+     WCAG AA gate the project claims in its README. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1.45;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.55;
+  --text-xl: 1.125rem;
+  --text-xl--line-height: 1.4;
+  --text-2xl: 1.375rem;
+  --text-2xl--line-height: 1.3;
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 1.2;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 1.12;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1.05;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 24px;
+
+  --color-brand-coral: #ff6b4a;
+  --color-brand-rose: #ef4773;
+  --color-brand-violet: #b45cff;
+
+  --color-primary-50: #f4f1fe;
+  --color-primary-100: #e9e2fd;
+  --color-primary-200: #d4c8fb;
+  --color-primary-300: #b7a2f7;
+  --color-primary-400: #9878f1;
+  --color-primary-500: #7c5ce7;
+  --color-primary-600: #6845d3;
+  --color-primary-700: #5636af;
+  --color-primary-800: #472f8e;
+  --color-primary-900: #3b2a72;
+
+  /* Workflow node ramp — one deliberate hue per DSL node type so the canvas
+     reads as a typed graph rather than a set of generic boxes. */
+  --color-node-trigger: #4d9dff;
+  --color-node-extract: #8b5cf6;
+  --color-node-retrieve: #a855f7;
+  --color-node-rule: #f5a524;
+  --color-node-agent: #2fbf82;
+  --color-node-transform: #14b8a6;
+  --color-node-tool: #ff8a3d;
+  --color-node-approval: #f4544a;
+  --color-node-wait: #94a3b8;
+  --color-node-notification: #38d6da;
+  --color-node-terminal: #2fbf82;
+}
+
+/* --------------------------------------------------------------------------
+   Layer 3 — utilities that follow the active theme
+   -------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-nav: var(--nav);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-line-accent: var(--border-accent);
+
+  --color-content: var(--text);
+  --color-content-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+
+  --color-warning: var(--warning);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+
+  --color-danger: var(--danger);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
+
+  --color-info: var(--info);
+  --color-info-fg: var(--info-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-border: var(--accent-border);
+
+  --shadow-e1: var(--elevation-1);
+  --shadow-e2: var(--elevation-2);
+  --shadow-e3: var(--elevation-3);
+  --shadow-glow: var(--elevation-glow);
+}

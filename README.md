@@ -7,6 +7,10 @@
 </p>
 
 <p align="center">
+  <a href="https://opsweave.sauravmukherjee.in/"><strong>Explore the live OpsWeave portal →</strong></a>
+</p>
+
+<p align="center">
   <a href="#architecture">Architecture</a> ·
   <a href="#product-surfaces">Product</a> ·
   <a href="#run-locally">Local setup</a> ·
@@ -30,6 +34,10 @@ Enterprise processes rarely live in one clean system. The actual workflow is sca
 OpsWeave ingests that fragmented, multimodal evidence and turns it into a versioned workflow that can be inspected, validated, evaluated, approved, and executed. Its first vertical is damaged-shipment claims processing.
 
 This is not a thin chat wrapper. The repository contains a full-stack product, asynchronous multimodal extraction, provenance-aware evidence storage, deterministic workflow validation, a portable JSON DSL, governed AWS execution, human callback approvals, idempotent tools, evaluation gates, traces, audit records, observability, rate limiting, and infrastructure as code.
+
+## Live portal
+
+The public guided workspace is available at **[opsweave.sauravmukherjee.in](https://opsweave.sauravmukherjee.in/)**. Visitors can explore the synthetic logistics evidence, workflow graph, evaluations, execution traces, and audit activity without supplying data. Cognito sign-in creates an isolated workspace for project creation, source uploads, and private configuration.
 
 ## Product principles
 
@@ -295,7 +303,7 @@ The security boundary includes:
 
 ### Authentication status
 
-Cognito resources and OAuth client configuration are provisioned. The public portfolio deployment intentionally operates as a guided demo tenant. Before accepting external tenant data, add an API Gateway JWT authorizer, derive tenant and actor identity only from verified Cognito claims, disable client-supplied identity headers, and make all destructive demo actions read-only.
+The production portal runs a public, read-only guided tenant alongside Cognito-backed private workspaces. OAuth uses authorization-code flow with PKCE and secure, HTTP-only session cookies. The API derives private tenant and actor identity from Cognito access tokens; local development alone accepts explicit development identity headers. Anonymous visitors are rate limited and cannot create projects, upload sources, or change workspace settings.
 
 ## Deploy to AWS
 
@@ -310,6 +318,12 @@ terraform -chdir=infra/terraform apply
 ```
 
 The account ID is required and enforced by the AWS provider's `allowed_account_ids` guard. The Bedrock Data Automation project ARN is also supplied as a variable; neither value is committed.
+
+### Custom domain
+
+The deployed portal is served from **[https://opsweave.sauravmukherjee.in](https://opsweave.sauravmukherjee.in/)**. Terraform provisions the regional ACM certificate, API Gateway custom-domain mapping, Cognito callback URLs, and CORS policy. DNS remains with Netlify, so the apex portfolio and unrelated project subdomains are unaffected.
+
+For another account or domain, set `portal_domain_name`, apply the certificate resource, create the emitted ACM validation CNAME at the authoritative DNS provider, then apply the remaining plan. Finally point the subdomain CNAME at Terraform's `portal_dns_target` output.
 
 Build and push the Lambda-compatible image with an immutable tag:
 

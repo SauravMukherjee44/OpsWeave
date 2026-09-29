@@ -4,7 +4,9 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  name = "opsweave-${var.environment}"
+  name        = "opsweave-${var.environment}"
+  portal_url  = "https://${var.portal_domain_name}"
+  web_origins = distinct(concat(var.allowed_web_origins, [local.portal_url]))
 }
 
 data "aws_iam_policy_document" "kms" {
@@ -88,7 +90,7 @@ resource "aws_s3_bucket_cors_configuration" "artifacts" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["POST"]
-    allowed_origins = concat(var.allowed_web_origins, [aws_apigatewayv2_api.api.api_endpoint])
+    allowed_origins = concat(local.web_origins, [aws_apigatewayv2_api.api.api_endpoint])
     expose_headers  = ["ETag"]
     max_age_seconds = 900
   }
@@ -153,8 +155,33 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
-  callback_urls                        = concat(var.allowed_web_origins, [aws_apigatewayv2_api.api.api_endpoint])
-  logout_urls                          = concat(var.allowed_web_origins, [aws_apigatewayv2_api.api.api_endpoint])
+  callback_urls = [
+    "${local.portal_url}/auth/callback",
+    "${aws_apigatewayv2_api.api.api_endpoint}/auth/callback",
+    "http://localhost:8000/auth/callback",
+  ]
+  logout_urls = [
+    local.portal_url,
+    aws_apigatewayv2_api.api.api_endpoint,
+    "http://localhost:3000",
+  ]
+}
+
+resource "aws_cognito_user_pool_domain" "app" {
+  domain       = "${local.name}-${data.aws_caller_identity.current.account_id}"
+  user_pool_id = aws_cognito_user_pool.app.id
+}
+
+# Netlify remains authoritative for sauravmukherjee.in. Terraform creates the
+# ACM certificate and exposes its DNS validation record; the CNAME itself is
+# intentionally managed in Netlify rather than creating a second DNS zone.
+resource "aws_acm_certificate" "portal" {
+  domain_name       = var.portal_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_vpc" "app" {

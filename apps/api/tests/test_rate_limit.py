@@ -16,5 +16,8 @@ def test_compilation_has_strict_daily_capacity():
     assert policy.global_[0].requests == 40
 
 
-def test_reads_are_not_counted_as_expensive_actions():
-    assert policy_for("/v1/projects", "GET") is None
+def test_reads_receive_high_volume_ip_and_tenant_protection():
+    policy = policy_for("/v1/projects", "GET")
+    assert policy is not None
+    assert policy.client[0].requests == 180
+    assert policy.ip[0].requests == 360

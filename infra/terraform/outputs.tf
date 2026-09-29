@@ -56,5 +56,17 @@ output "hosted_api_url" {
 }
 
 output "portal_url" {
-  value = aws_apigatewayv2_api.api.api_endpoint
+  value = local.portal_url
+}
+
+output "portal_certificate_validation_record" {
+  value = {
+    name  = tolist(aws_acm_certificate.portal.domain_validation_options)[0].resource_record_name
+    type  = tolist(aws_acm_certificate.portal.domain_validation_options)[0].resource_record_type
+    value = tolist(aws_acm_certificate.portal.domain_validation_options)[0].resource_record_value
+  }
+}
+
+output "portal_dns_target" {
+  value = aws_apigatewayv2_domain_name.portal.domain_name_configuration[0].target_domain_name
 }

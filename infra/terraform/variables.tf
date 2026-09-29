@@ -43,6 +43,12 @@ variable "allowed_web_origins" {
   default     = ["http://localhost:3000"]
 }
 
+variable "portal_domain_name" {
+  type        = string
+  description = "Public HTTPS hostname for the OpsWeave portal; DNS stays managed by Netlify."
+  default     = "opsweave.sauravmukherjee.in"
+}
+
 variable "enable_relational_database" {
   type        = bool
   description = "Provision PostgreSQL/Aurora. Disabled for the six-month free-plan demo runtime."
@@ -63,5 +69,5 @@ variable "bda_project_arn" {
 variable "api_image_tag" {
   type        = string
   description = "Immutable ECR image tag deployed to the hosted OpsWeave API"
-  default     = "hosted-v7"
+  default     = "hosted-v8"
 }
