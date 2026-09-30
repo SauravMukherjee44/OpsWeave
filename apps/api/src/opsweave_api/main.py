@@ -7,6 +7,7 @@ import json
 import logging
 from pathlib import Path
 import secrets
+import time
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest, urlopen
 import uuid
@@ -41,6 +42,7 @@ compilation_queue = CompilationQueue(settings)
 cloud = CloudRepository(settings)
 runtime = RuntimeService(settings)
 logger = logging.getLogger("opsweave.api")
+logger.setLevel(logging.INFO)
 workspace_hydration_lock = asyncio.Lock()
 hydrated_tenants: set[str] = set()
 
@@ -99,7 +101,21 @@ lambda_handler = Mangum(app, lifespan="auto")
 
 @app.middleware("http")
 async def security_headers(request, call_next):
-    response = await call_next(request)
+    started_at = time.monotonic()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception("request_failed path=%s method=%s", request.url.path, request.method)
+        raise
+    duration_ms = round((time.monotonic() - started_at) * 1000)
+    if request.url.path.startswith(("/v1", "/auth")):
+        logger.info(
+            "request_complete path=%s method=%s status=%s duration_ms=%s",
+            request.url.path,
+            request.method,
+            response.status_code,
+            duration_ms,
+        )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -129,7 +145,7 @@ def _oauth_redirect(screen_hint: str | None = None) -> RedirectResponse:
     query = {
         "client_id": settings.cognito_client_id,
         "response_type": "code",
-        "scope": "openid email profile",
+        "scope": "openid email profile aws.cognito.signin.user.admin",
         "redirect_uri": f"{settings.public_app_url}/auth/callback",
         "state": state,
         "code_challenge_method": "S256",

@@ -197,6 +197,7 @@ export default function Home() {
   const bootstrapFailed =
     (health.isError && health.data === undefined) ||
     (projects.isError && projects.data === undefined);
+  const bootstrapError = (projects.error ?? health.error) as (Error & { status?: number }) | null;
   const isGuest = workspaceInfo.data?.role === "demo guest";
 
   const requestPrivateWorkspace = () => setShowAuth(true);
@@ -263,19 +264,24 @@ export default function Home() {
             <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-danger-border bg-danger-bg px-4 py-3.5 text-xs text-content-2">
               <CircleAlert size={18} className="shrink-0 text-danger-fg" />
               <span className="min-w-50 flex-1">
-                <strong className="text-content">OpsWeave could not finish loading.</strong> The live
-                workspace did not respond after several attempts. No placeholder data is being shown.
+                <strong className="text-content">OpsWeave could not finish loading.</strong>{" "}
+                {bootstrapError?.message ?? "The live workspace did not respond after several attempts."}
+                {bootstrapError?.status ? ` (HTTP ${bootstrapError.status})` : ""} No placeholder data is being shown.
               </span>
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() =>
+                onClick={() => {
+                  if (bootstrapError?.status === 401) {
+                    window.location.assign("/auth/login");
+                    return;
+                  }
                   void health.refetch().then((result) => {
                     if (result.isSuccess) void projects.refetch();
-                  })
-                }
+                  });
+                }}
               >
-                Try again
+                {bootstrapError?.status === 401 ? "Sign in again" : "Try again"}
               </Button>
             </div>
           ) : null}
