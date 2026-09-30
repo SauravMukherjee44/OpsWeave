@@ -80,6 +80,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       OPSWEAVE_ENVIRONMENT                   = var.environment
       OPSWEAVE_DATABASE_URL                  = "sqlite+aiosqlite:////tmp/opsweave.db"
+      OPSWEAVE_LOCAL_UPLOAD_DIR              = "/tmp/opsweave-uploads"
       OPSWEAVE_CORS_ORIGINS                  = join(",", local.web_origins)
       OPSWEAVE_ARTIFACT_BUCKET               = aws_s3_bucket.artifacts.id
       OPSWEAVE_COMPILATION_QUEUE_URL         = aws_sqs_queue.compilation.url

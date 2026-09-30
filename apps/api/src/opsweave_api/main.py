@@ -63,15 +63,17 @@ async def lifespan(_: FastAPI):
 async def hydrate_workspace(tenant_id: str | None = None) -> None:
     """Hydrate cloud state only for API requests, never for static asset requests."""
     tenant_id = tenant_id or settings.demo_tenant_id
-    if tenant_id in hydrated_tenants or settings.environment == "local" or not cloud.enabled:
+    cacheable = tenant_id == settings.demo_tenant_id
+    if (cacheable and tenant_id in hydrated_tenants) or settings.environment == "local" or not cloud.enabled:
         return
     async with workspace_hydration_lock:
-        if tenant_id in hydrated_tenants:
+        if cacheable and tenant_id in hydrated_tenants:
             return
         async with SessionFactory() as session:
             for remote_project in await cloud.tenant_projects(tenant_id):
                 project_id = remote_project["project_id"]
-                if await session.get(Project, project_id) is None:
+                project = await session.get(Project, project_id)
+                if project is None:
                     session.add(Project(
                         id=project_id, tenant_id=tenant_id,
                         name=remote_project["name"], description=remote_project.get("description", ""),
@@ -80,17 +82,26 @@ async def hydrate_workspace(tenant_id: str | None = None) -> None:
                         updated_at=datetime.fromisoformat(remote_project["updated_at"]),
                     ))
                     await session.flush()
+                else:
+                    project.name = remote_project["name"]
+                    project.description = remote_project.get("description", "")
+                    project.status = ProjectStatus(remote_project.get("status", "draft"))
+                    project.updated_at = datetime.fromisoformat(remote_project["updated_at"])
                 remote_workspace = await cloud.project_workspace(project_id, tenant_id)
                 for item in remote_workspace["artifacts"]:
-                    if await session.get(Artifact, item["artifact_id"]) is None:
+                    artifact = await session.get(Artifact, item["artifact_id"])
+                    if artifact is None:
                         session.add(Artifact(
                             id=item["artifact_id"], tenant_id=tenant_id, project_id=project_id,
                             filename=item["filename"], media_type=item["media_type"], size_bytes=int(item["size_bytes"]),
                             storage_key=item["storage_key"], checksum_sha256=item["checksum_sha256"],
                             status=item.get("status", "stored"), created_at=datetime.fromisoformat(item["created_at"]),
                         ))
+                    else:
+                        artifact.status = item.get("status", artifact.status)
             await session.commit()
-        hydrated_tenants.add(tenant_id)
+        if cacheable:
+            hydrated_tenants.add(tenant_id)
 
 
 app = FastAPI(title="OpsWeave API", version="0.1.0", lifespan=lifespan)
@@ -127,7 +138,13 @@ async def security_headers(request, call_next):
 @app.middleware("http")
 async def hydrate_api_workspace(request, call_next):
     if request.url.path.startswith("/v1"):
-        await hydrate_workspace()
+        principal = await get_principal(
+            request,
+            authorization=request.headers.get("authorization"),
+            x_tenant_id=request.headers.get("x-tenant-id"),
+            x_actor_id=request.headers.get("x-actor-id"),
+        )
+        await hydrate_workspace(principal.tenant_id)
     return await call_next(request)
 
 
@@ -258,7 +275,6 @@ async def list_audit_events(
 
 @app.get("/v1/projects", response_model=list[ProjectRead])
 async def list_projects(principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
-    await hydrate_workspace(principal.tenant_id)
     rows = await session.execute(
         select(Project, func.count(Artifact.id))
         .outerjoin(Artifact)
@@ -314,6 +330,8 @@ async def upload_artifact(project_id: str, upload: UploadFile = File(...), princ
             await storage.upload_file(path, storage_key, media_type)
         except Exception as error:
             raise HTTPException(status_code=502, detail="Unable to store the artifact in the OpsWeave S3 bucket") from error
+        finally:
+            path.unlink(missing_ok=True)
     artifact = Artifact(id=artifact_id, tenant_id=principal.tenant_id, project_id=project_id, filename=safe_name, media_type=media_type, size_bytes=size, storage_key=storage_key, checksum_sha256=checksum)
     session.add(artifact)
     await session.flush()
@@ -335,6 +353,20 @@ async def preview_artifact(artifact_id: str, principal: Principal = Depends(get_
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Artifact content is unavailable")
     return FileResponse(path, media_type=artifact.media_type, filename=artifact.filename, content_disposition_type="inline")
+
+
+@app.get("/v1/artifacts/{artifact_id}/preview-url")
+async def preview_artifact_url(artifact_id: str, principal: Principal = Depends(get_principal), session: AsyncSession = Depends(get_session)):
+    artifact = await session.scalar(select(Artifact).where(Artifact.id == artifact_id, Artifact.tenant_id == principal.tenant_id))
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    if settings.artifact_bucket and artifact.storage_key.startswith("quarantine/"):
+        text_types = {"application/json", "application/yaml", "application/x-yaml", "text/yaml", "text/csv"}
+        if artifact.media_type.startswith("text/") or artifact.media_type in text_types:
+            content, truncated = await storage.read_text(artifact.storage_key)
+            return {"url": storage.presign_get(artifact.storage_key, artifact.filename), "expires_in": 300, "content": content, "truncated": truncated}
+        return {"url": storage.presign_get(artifact.storage_key, artifact.filename), "expires_in": 300}
+    return {"url": f"/v1/artifacts/{artifact_id}/preview", "expires_in": 300}
 
 
 @app.post("/v1/uploads/presign", response_model=PresignResponse)

@@ -71,3 +71,18 @@ class ArtifactStorage:
             )
 
         await asyncio.to_thread(upload)
+
+    async def read_text(self, key: str, max_bytes: int = 512 * 1024) -> tuple[str, bool]:
+        if not self.settings.artifact_bucket:
+            raise RuntimeError("S3 artifact bucket is not configured")
+
+        def read() -> tuple[str, bool]:
+            response = boto3.client("s3", region_name=self.settings.aws_region).get_object(
+                Bucket=self.settings.artifact_bucket,
+                Key=key,
+                Range=f"bytes=0-{max_bytes}",
+            )
+            payload = response["Body"].read()
+            return payload[:max_bytes].decode("utf-8", errors="replace"), len(payload) > max_bytes
+
+        return await asyncio.to_thread(read)

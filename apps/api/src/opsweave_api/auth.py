@@ -27,23 +27,32 @@ async def get_principal(
     x_tenant_id: str | None = Header(default=None),
     x_actor_id: str | None = Header(default=None),
 ) -> Principal:
+    cached_principal = getattr(request.state, "principal", None)
+    if cached_principal is not None:
+        return cached_principal
     settings = get_settings()
     token = authorization.removeprefix("Bearer ").strip() if authorization and authorization.startswith("Bearer ") else request.cookies.get("opsweave_access")
     if token:
         try:
             attributes = await asyncio.to_thread(_cognito_identity, token)
             subject = attributes["sub"]
-            return Principal(
+            principal = Principal(
                 tenant_id=str(uuid.uuid5(uuid.NAMESPACE_URL, f"opsweave:user:{subject}")),
                 actor_id=subject,
                 email=attributes.get("email"),
                 authenticated=True,
             )
+            request.state.principal = principal
+            return principal
         except Exception as error:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is invalid or expired") from error
     if settings.environment == "local" and x_tenant_id:
-        return Principal(tenant_id=x_tenant_id, actor_id=x_actor_id or "local-user", authenticated=True)
-    return Principal(tenant_id=settings.demo_tenant_id, actor_id="demo-visitor", authenticated=False)
+        principal = Principal(tenant_id=x_tenant_id, actor_id=x_actor_id or "local-user", authenticated=True)
+        request.state.principal = principal
+        return principal
+    principal = Principal(tenant_id=settings.demo_tenant_id, actor_id="demo-visitor", authenticated=False)
+    request.state.principal = principal
+    return principal
 
 
 async def require_member(principal: Principal = None) -> Principal:
