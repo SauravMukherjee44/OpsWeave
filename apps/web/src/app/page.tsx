@@ -68,9 +68,11 @@ export default function Home() {
     retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 3_000),
     refetchInterval: 30_000,
   });
-  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects, enabled: health.isSuccess, retry: 2 });
-  const workspaceInfo = useQuery({ queryKey: ["workspace-info"], queryFn: api.workspaceInfo, enabled: projects.isSuccess });
-  const auditEvents = useQuery({ queryKey: ["audit-events"], queryFn: api.auditEvents, enabled: projects.isSuccess, refetchInterval: 20_000 });
+  const hasHealthyBackend = health.data?.status === "ok";
+  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects, enabled: hasHealthyBackend, retry: 2 });
+  const hasProjectResponse = projects.data !== undefined;
+  const workspaceInfo = useQuery({ queryKey: ["workspace-info"], queryFn: api.workspaceInfo, enabled: hasProjectResponse });
+  const auditEvents = useQuery({ queryKey: ["audit-events"], queryFn: api.auditEvents, enabled: hasProjectResponse, refetchInterval: 20_000 });
 
   const activeProjectId = selectedProjectId ?? projects.data?.[0]?.id ?? null;
   const selectedProject = useMemo(
@@ -180,14 +182,21 @@ export default function Home() {
     Array.from(files).forEach((file) => upload.mutate({ projectId: activeProjectId, file }));
   };
 
-  const backendOnline = health.isSuccess;
+  const backendOnline = hasHealthyBackend;
   const awsConnected = health.data?.aws_configured === true;
   const cloudStatus = new Map(
     (workspace.data?.artifacts ?? []).map((artifact) => [artifact.artifact_id, artifact.status]),
   );
   const heading = surfaceCopy[surface];
-  const isBootstrapping = health.isPending || (health.isSuccess && projects.isPending);
-  const bootstrapFailed = health.isError || projects.isError;
+  // A background refetch can fail while TanStack Query still holds valid data.
+  // Keep rendering that last known-good workspace and reserve the blocking error
+  // state for an initial load that never produced usable data.
+  const isBootstrapping =
+    (health.isPending && health.data === undefined) ||
+    (hasHealthyBackend && projects.isPending && projects.data === undefined);
+  const bootstrapFailed =
+    (health.isError && health.data === undefined) ||
+    (projects.isError && projects.data === undefined);
   const isGuest = workspaceInfo.data?.role === "demo guest";
 
   const requestPrivateWorkspace = () => setShowAuth(true);
