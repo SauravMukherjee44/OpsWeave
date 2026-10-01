@@ -1,3 +1,4 @@
+import { Check, CircleAlert, CircleDot, Clock3, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -57,15 +58,34 @@ export function statusTone(status: string): Tone {
   const value = status.toLowerCase();
   if (["succeeded", "processed", "published", "passed", "resolved", "approved", "stored"].includes(value)) return "success";
   if (["failed", "rejected", "failed_to_start", "invalid", "open"].includes(value)) return "danger";
-  if (["running", "starting", "resuming", "pending", "queued", "ingesting", "compiling", "draft"].includes(value)) return "warning";
+  if (["running", "starting", "resuming", "pending", "queued", "ingesting", "compiling", "processing", "draft"].includes(value)) return "warning";
   return "neutral";
 }
 
 export function StatusBadge({ status, className }: { status: string; className?: string }) {
+  const tone = statusTone(status);
+  const value = status.toLowerCase();
+  const complete = ["succeeded", "processed", "published", "passed", "resolved", "approved", "stored"].includes(value);
+  const failed = ["failed", "rejected", "failed_to_start", "invalid", "open"].includes(value);
+  const loading = ["running", "starting", "resuming", "queued", "ingesting", "compiling", "processing"].includes(value);
+  const Icon = complete ? Check : failed ? CircleAlert : loading ? LoaderCircle : value === "pending" ? Clock3 : CircleDot;
   return (
-    <Badge tone={statusTone(status)} dot className={cn("capitalize", className)}>
+    <span
+      className={cn(
+        "group/status relative inline-flex w-max items-center gap-1.5 overflow-hidden rounded-full border px-2.5 py-1 text-2xs font-[650] capitalize",
+        "shadow-[inset_0_1px_0_color-mix(in_srgb,white_10%,transparent)] transition-[filter,transform] hover:-translate-y-px hover:brightness-110",
+        tone === "success" && "border-success-border bg-[linear-gradient(135deg,var(--success-bg),color-mix(in_srgb,var(--success)_11%,var(--surface)))] text-success-fg",
+        tone === "danger" && "border-danger-border bg-[linear-gradient(135deg,var(--danger-bg),color-mix(in_srgb,var(--danger)_10%,var(--surface)))] text-danger-fg",
+        tone === "warning" && "border-warning-border bg-[linear-gradient(135deg,var(--warning-bg),color-mix(in_srgb,var(--warning)_9%,var(--surface)))] text-warning-fg",
+        tone === "neutral" && "border-line bg-surface-3 text-muted",
+        className,
+      )}
+    >
+      <span className={cn("grid size-4 place-items-center rounded-full bg-[color-mix(in_srgb,currentColor_12%,transparent)]", complete && "shadow-[0_0_10px_color-mix(in_srgb,var(--success)_34%,transparent)]")}>
+        <Icon size={10} strokeWidth={2.5} className={cn(loading && "animate-spin")} />
+      </span>
       {status.replaceAll("_", " ")}
-    </Badge>
+    </span>
   );
 }
 

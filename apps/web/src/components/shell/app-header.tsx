@@ -13,6 +13,9 @@ export function AppHeader({
   onCreate,
   onSignIn,
   onOpenNav,
+  onOpenHelp,
+  onOpenNotifications,
+  unreadNotifications,
 }: {
   theme: Theme;
   isGuest: boolean;
@@ -20,6 +23,9 @@ export function AppHeader({
   onCreate: () => void;
   onSignIn: () => void;
   onOpenNav: () => void;
+  onOpenHelp: () => void;
+  onOpenNotifications: () => void;
+  unreadNotifications: number;
 }) {
   return (
     <header
@@ -45,12 +51,16 @@ export function AppHeader({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <IconButton label="Help" className="hidden sm:grid">
+        <IconButton label="Help" onClick={onOpenHelp} className="hidden sm:grid">
           <HelpCircle size={18} />
         </IconButton>
-        <IconButton label="Notifications" className="hidden sm:grid">
+        <IconButton label="Notifications" onClick={onOpenNotifications} className="hidden sm:grid">
           <Bell size={18} />
-          <i className="absolute top-2 right-2 size-1.5 rounded-full bg-danger ring-2 ring-[var(--bg)]" />
+          {unreadNotifications ? (
+            <i className="absolute top-1 right-0 grid min-w-4 place-items-center rounded-full bg-danger px-1 font-mono text-[8px] font-bold text-white ring-2 ring-[var(--bg)]">
+              {unreadNotifications > 9 ? "9+" : unreadNotifications}
+            </i>
+          ) : null}
         </IconButton>
 
         <button
