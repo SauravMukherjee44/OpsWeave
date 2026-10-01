@@ -82,10 +82,17 @@ export default function Home() {
     refetchInterval: 30_000,
   });
   const hasHealthyBackend = health.data?.status === "ok";
-  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects, enabled: hasHealthyBackend, retry: 2 });
+  const retryUnlessRateLimited = (failureCount: number, error: Error) =>
+    (error as Error & { status?: number }).status !== 429 && failureCount < 2;
+  const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects, enabled: hasHealthyBackend, retry: retryUnlessRateLimited });
   const hasProjectResponse = projects.data !== undefined;
   const workspaceInfo = useQuery({ queryKey: ["workspace-info"], queryFn: api.workspaceInfo, enabled: hasProjectResponse });
-  const auditEvents = useQuery({ queryKey: ["audit-events"], queryFn: api.auditEvents, enabled: hasProjectResponse, refetchInterval: 20_000 });
+  const auditEvents = useQuery({
+    queryKey: ["audit-events"],
+    queryFn: api.auditEvents,
+    enabled: hasProjectResponse,
+    refetchInterval: surface === "activity" || surface === "overview" ? 60_000 : false,
+  });
 
   const activeProjectId = selectedProjectId ?? projects.data?.[0]?.id ?? null;
   const selectedProject = useMemo(
@@ -102,25 +109,25 @@ export default function Home() {
     queryKey: ["workspace", activeProjectId],
     queryFn: () => api.workspace(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: 10_000,
+    refetchInterval: ["overview", "sources", "evidence", "conflicts", "workflow"].includes(surface) ? 30_000 : false,
   });
   const executions = useQuery({
     queryKey: ["executions", activeProjectId],
     queryFn: () => api.executions(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: 4_000,
+    refetchInterval: surface === "operations" || surface === "overview" ? 10_000 : false,
   });
   const approvals = useQuery({
     queryKey: ["approvals", activeProjectId],
     queryFn: () => api.approvals(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: 4_000,
+    refetchInterval: surface === "operations" || surface === "overview" ? 10_000 : false,
   });
   const evaluations = useQuery({
     queryKey: ["evaluations", activeProjectId],
     queryFn: () => api.evaluations(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: 15_000,
+    refetchInterval: surface === "evaluations" || surface === "overview" ? 60_000 : false,
   });
 
   const createProject = useMutation({
