@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="docs/assets/opsweave-banner.png" alt="OpsWeave — Evidence to governed execution" width="100%" />
+  <img src="docs/assets/opsweave-banner.png" alt="OpsWeave multimodal evidence flowing through a governed agentic workflow into approval, secure execution, and observability" width="100%" />
 </p>
 
 <p align="center">
-  <strong>A multimodal, evidence-bound workflow intelligence platform on AWS.</strong>
+  <strong>Compile fragmented enterprise evidence into safe, inspectable, executable workflows.</strong>
 </p>
 
 <p align="center">
@@ -24,6 +24,8 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-Serverless-FF9900?logo=amazonwebservices&logoColor=white" />
   <img alt="Terraform" src="https://img.shields.io/badge/Infrastructure-Terraform-844FBA?logo=terraform" />
   <img alt="Tests" src="https://img.shields.io/badge/API_tests-22_passing-22C55E" />
+  <img alt="Evaluation gates" src="https://img.shields.io/badge/Evaluation_gates-4%2F4_passing-30D593" />
+  <img alt="Theme" src="https://img.shields.io/badge/UI-Dark_%2B_Light-B34FE8" />
   <img alt="License" src="https://img.shields.io/badge/data-synthetic_only-60A5FA" />
 </p>
 
@@ -334,8 +336,8 @@ docker build \
   --provenance=false \
   --sbom=false \
   -f apps/api/Dockerfile.lambda \
-  -t "$ECR_REPOSITORY:hosted-v17" .
-docker push "$ECR_REPOSITORY:hosted-v17"
+  -t "$ECR_REPOSITORY:hosted-v18" .
+docker push "$ECR_REPOSITORY:hosted-v18"
 ```
 
 Then set `api_image_tag` to that immutable tag and apply Terraform. The Lambda container serves both the static portal and API from one HTTPS API Gateway origin, avoiding an always-on web server.
