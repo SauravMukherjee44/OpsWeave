@@ -54,8 +54,8 @@ data "aws_iam_policy_document" "worker" {
     resources = [aws_ssm_parameter.model_calls_enabled.arn]
   }
   statement {
-    actions   = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey", "kms:DescribeKey", "kms:CreateGrant"]
-    resources = [aws_kms_key.app.arn]
+    actions   = ["events:EnableRule", "events:DisableRule"]
+    resources = [aws_cloudwatch_event_rule.status.arn]
   }
 }
 
@@ -67,7 +67,6 @@ resource "aws_iam_role_policy" "worker" {
 resource "aws_cloudwatch_log_group" "worker" {
   name              = "/opsweave/${var.environment}/worker"
   retention_in_days = 7
-  kms_key_id        = aws_kms_key.app.arn
 }
 
 resource "aws_lambda_function" "worker" {
@@ -85,9 +84,9 @@ resource "aws_lambda_function" "worker" {
       ARTIFACT_BUCKET               = aws_s3_bucket.artifacts.id
       BDA_PROJECT_ARN               = var.bda_project_arn
       BDA_PROFILE_ARN               = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:data-automation-profile/us.data-automation-v1"
-      KMS_KEY_ARN                   = aws_kms_key.app.arn
       MODEL_CALLS_ENABLED_PARAMETER = aws_ssm_parameter.model_calls_enabled.name
       BEDROCK_REASONING_MODEL_ID    = var.bedrock_reasoning_model_id
+      STATUS_RULE_NAME              = aws_cloudwatch_event_rule.status.name
     }
   }
   depends_on = [aws_iam_role_policy.worker, aws_cloudwatch_log_group.worker]
@@ -117,9 +116,9 @@ resource "aws_lambda_function" "status" {
       ARTIFACT_BUCKET               = aws_s3_bucket.artifacts.id
       BDA_PROJECT_ARN               = var.bda_project_arn
       BDA_PROFILE_ARN               = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:data-automation-profile/us.data-automation-v1"
-      KMS_KEY_ARN                   = aws_kms_key.app.arn
       MODEL_CALLS_ENABLED_PARAMETER = aws_ssm_parameter.model_calls_enabled.name
       BEDROCK_REASONING_MODEL_ID    = var.bedrock_reasoning_model_id
+      STATUS_RULE_NAME              = aws_cloudwatch_event_rule.status.name
     }
   }
   depends_on = [aws_iam_role_policy.worker, aws_cloudwatch_log_group.worker]
@@ -140,7 +139,6 @@ resource "aws_lambda_function" "runtime" {
       ARTIFACT_BUCKET               = aws_s3_bucket.artifacts.id
       BDA_PROJECT_ARN               = var.bda_project_arn
       BDA_PROFILE_ARN               = "arn:aws:bedrock:${var.aws_region}:${data.aws_caller_identity.current.account_id}:data-automation-profile/us.data-automation-v1"
-      KMS_KEY_ARN                   = aws_kms_key.app.arn
       MODEL_CALLS_ENABLED_PARAMETER = aws_ssm_parameter.model_calls_enabled.name
       BEDROCK_REASONING_MODEL_ID    = var.bedrock_reasoning_model_id
     }
@@ -228,6 +226,7 @@ resource "aws_sfn_state_machine" "claims" {
 resource "aws_cloudwatch_event_rule" "status" {
   name                = "${local.name}-bda-status"
   schedule_expression = "rate(5 minutes)"
+  state               = "DISABLED"
 }
 
 resource "aws_cloudwatch_event_target" "status" {

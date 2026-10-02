@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, CircleAlert, Plus, WandSparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Artifact } from "@/lib/api";
+import { api, type Artifact, type Execution, type ProjectWorkspace } from "@/lib/api";
 import { surfaceCopy, type Surface } from "@/lib/surfaces";
 import { surfaceTransition } from "@/lib/motion";
 import { Button, EmptyState } from "@/components/ui";
@@ -79,7 +79,6 @@ export default function Home() {
     queryFn: api.health,
     retry: 3,
     retryDelay: (attempt) => Math.min(750 * 2 ** attempt, 3_000),
-    refetchInterval: 30_000,
   });
   const hasHealthyBackend = health.data?.status === "ok";
   const retryUnlessRateLimited = (failureCount: number, error: Error) =>
@@ -87,12 +86,7 @@ export default function Home() {
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects, enabled: hasHealthyBackend, retry: retryUnlessRateLimited });
   const hasProjectResponse = projects.data !== undefined;
   const workspaceInfo = useQuery({ queryKey: ["workspace-info"], queryFn: api.workspaceInfo, enabled: hasProjectResponse });
-  const auditEvents = useQuery({
-    queryKey: ["audit-events"],
-    queryFn: api.auditEvents,
-    enabled: hasProjectResponse,
-    refetchInterval: surface === "activity" || surface === "overview" ? 60_000 : false,
-  });
+  const auditEvents = useQuery({ queryKey: ["audit-events"], queryFn: api.auditEvents, enabled: hasProjectResponse });
 
   const activeProjectId = selectedProjectId ?? projects.data?.[0]?.id ?? null;
   const selectedProject = useMemo(
@@ -109,25 +103,29 @@ export default function Home() {
     queryKey: ["workspace", activeProjectId],
     queryFn: () => api.workspace(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: ["overview", "sources", "evidence", "conflicts", "workflow"].includes(surface) ? 30_000 : false,
+    refetchInterval: (query) => {
+      const current = query.state.data as ProjectWorkspace | undefined;
+      return current?.compilations.some((job) => ["pending", "queued", "ingesting", "compiling"].includes(job.status)) ? 5_000 : false;
+    },
   });
   const executions = useQuery({
     queryKey: ["executions", activeProjectId],
     queryFn: () => api.executions(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: surface === "operations" || surface === "overview" ? 10_000 : false,
+    refetchInterval: (query) => {
+      const current = query.state.data as Execution[] | undefined;
+      return surface === "operations" && current?.some((execution) => ["starting", "running", "waiting_for_approval"].includes(execution.status)) ? 5_000 : false;
+    },
   });
   const approvals = useQuery({
     queryKey: ["approvals", activeProjectId],
     queryFn: () => api.approvals(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: surface === "operations" || surface === "overview" ? 10_000 : false,
   });
   const evaluations = useQuery({
     queryKey: ["evaluations", activeProjectId],
     queryFn: () => api.evaluations(activeProjectId!),
     enabled: Boolean(activeProjectId),
-    refetchInterval: surface === "evaluations" || surface === "overview" ? 60_000 : false,
   });
 
   const createProject = useMutation({
