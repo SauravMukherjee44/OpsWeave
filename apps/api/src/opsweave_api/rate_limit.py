@@ -36,14 +36,14 @@ def policy_for(path: str, method: str) -> Policy | None:
     if not path.startswith("/v1/"):
         return None
     if method == "GET":
-        # Reads power the live portal and are intentionally limited as short bursts.
-        # A daily IP quota made a normally-open dashboard exhaust its allowance.
+        # Reads power the live portal. Short windows absorb normal interactive bursts;
+        # generous daily ceilings contain sustained abuse without penalizing an open tab.
         # API Gateway provides an additional account-level requests-per-second guard.
         return Policy(
-            client=(Limit(300, 60, "read-minute-v2"),),
-            ip=(Limit(600, 60, "read-ip-minute-v2"),),
-            tenant=(),
-            global_=(Limit(3_000, 60, "read-global-minute-v2"),),
+            client=(Limit(300, 60, "read-minute-v3"), Limit(25_000, DAY, "read-day-v3")),
+            ip=(Limit(600, 60, "read-ip-minute-v3"), Limit(50_000, DAY, "read-ip-day-v3")),
+            tenant=(Limit(250_000, DAY, "read-tenant-day-v3"),),
+            global_=(Limit(3_000, 60, "read-global-minute-v3"), Limit(1_000_000, DAY, "read-global-day-v3")),
         )
     if method not in {"POST", "PATCH", "DELETE"}:
         return None
