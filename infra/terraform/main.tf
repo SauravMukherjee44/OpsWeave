@@ -349,8 +349,8 @@ resource "aws_ecr_repository" "api" {
   }
 }
 
-# Keep one deployed image and one rollback image. This prevents stale OpsWeave
-# container releases from accumulating in the project's dedicated repository.
+# Keep only the deployed image so the repository stays below ECR's 500 MB
+# first-year Free Tier storage allowance. Git retains the reproducible source.
 resource "aws_ecr_lifecycle_policy" "api" {
   repository = aws_ecr_repository.api.name
 
@@ -369,12 +369,12 @@ resource "aws_ecr_lifecycle_policy" "api" {
       },
       {
         rulePriority = 2
-        description  = "Retain only the two newest hosted API releases"
+        description  = "Retain only the deployed hosted API release"
         selection = {
           tagStatus     = "tagged"
           tagPrefixList = ["hosted-v"]
           countType     = "imageCountMoreThan"
-          countNumber   = 2
+          countNumber   = 1
         }
         action = { type = "expire" }
       },
