@@ -65,6 +65,17 @@ def main() -> None:
         raise SystemExit("Working tree must be clean before preview or rewrite")
 
     old_head = git("rev-parse", "refs/heads/main").decode().strip()
+    remote_head: str | None = None
+    if args.push:
+        remote_ref = git("ls-remote", "origin", "refs/heads/main").decode().strip()
+        if not remote_ref:
+            raise SystemExit("origin/main is missing; refusing to force push")
+        remote_head = remote_ref.split()[0]
+        if subprocess.run(
+            ["git", "merge-base", "--is-ancestor", remote_head, old_head],
+            check=False,
+        ).returncode != 0:
+            raise SystemExit("origin/main is not an ancestor of local main; fetch and review remote changes")
     commits = git("rev-list", "--reverse", "refs/heads/main").decode().splitlines()
     if not commits:
         raise SystemExit("No commits found")
@@ -117,7 +128,8 @@ def main() -> None:
     print(f"Rewrote local main: {old_head[:10]} -> {parent[:10]}")
     print(f"Backup branch: {backup.removeprefix('refs/heads/')}")
     if args.push:
-        git("push", f"--force-with-lease=refs/heads/main:{old_head}", "origin", "main")
+        assert remote_head is not None
+        git("push", f"--force-with-lease=refs/heads/main:{remote_head}", "origin", "main")
         print("Updated origin/main with force-with-lease")
 
 
