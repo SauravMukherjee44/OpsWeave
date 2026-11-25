@@ -34,7 +34,13 @@ variable "monthly_budget_usd" {
 
 variable "budget_notification_email" {
   type        = string
-  description = "Email address that receives AWS budget alerts"
+  description = "Email address that receives AWS budget and traffic alerts"
+}
+
+variable "manage_account_spend_alert" {
+  type        = bool
+  description = "Manage the account-wide $5 spend alert before credits. Defaults to enabled in dev and disabled in prod. Use one owner per AWS account."
+  default     = null
 }
 
 variable "allowed_web_origins" {

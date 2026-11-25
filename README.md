@@ -352,11 +352,14 @@ The demo architecture is deliberately scale-to-zero or pay-per-request:
 - S3 AES-256 encryption and lifecycle controls;
 - no idle browser polling: refreshes run only while a user-started compilation or execution is active;
 - a Bedrock status rule that enables only while ingestion work is pending;
-- API Gateway throttling at 10 requests/second with a burst of 20;
+- API Gateway throttling at 10 requests/second with a burst of 20, plus 0.5 requests/second with a burst of two on each compilation, execution, and evaluation write route;
 - a 30,000-request global daily circuit breaker, keeping normal API traffic below roughly 900,000 requests/month;
 - global daily action caps of 30 uploads, 8 compilations, 50 executions, 20 evaluations, and 500 artifact previews;
 - short development log retention, a disabled-by-default relational database, and an SSM model-call kill switch;
-- a $20 OpsWeave budget plus a separate $40 account budget, using the activated `Application` cost-allocation tag.
+- a $20 OpsWeave budget, a separate $40 account budget, and a monthly $5 actual-spend alert that excludes credits and refunds;
+- API request, compilation invocation, and workflow invocation alarms delivered through the OpsWeave SNS topic to `budget_notification_email`.
+
+The deployed `dev` Terraform state owns the account-wide $5 alert. Set `manage_account_spend_alert = false` on any other state in the same account. When moving this state, carry it forward so Terraform retains the IDs of the existing routes, alarms, and confirmed SNS subscription.
 
 AWS Budgets send alerts; they do not stop services. OpsWeave therefore enforces its request and expensive-action ceilings in the API as operational circuit breakers. Free-tier allowances are account-level and can change, so the project dashboard and Cost Explorer remain the source of truth for spend shared across the account.
 

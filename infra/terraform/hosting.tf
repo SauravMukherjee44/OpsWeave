@@ -122,6 +122,22 @@ resource "aws_apigatewayv2_route" "default" {
   target    = "integrations/${aws_apigatewayv2_integration.api.id}"
 }
 
+locals {
+  expensive_api_routes = toset([
+    "POST /v1/projects/{project_id}/compilations",
+    "POST /v1/executions",
+    "POST /v1/workflows/{workflow_id}/evaluations",
+  ])
+}
+
+resource "aws_apigatewayv2_route" "expensive" {
+  for_each = local.expensive_api_routes
+
+  api_id    = aws_apigatewayv2_api.api.id
+  route_key = each.key
+  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.api.id
   name        = "$default"
@@ -129,6 +145,15 @@ resource "aws_apigatewayv2_stage" "default" {
   default_route_settings {
     throttling_burst_limit = 20
     throttling_rate_limit  = 10
+  }
+
+  dynamic "route_settings" {
+    for_each = aws_apigatewayv2_route.expensive
+    content {
+      route_key              = route_settings.value.route_key
+      throttling_burst_limit = 2
+      throttling_rate_limit  = 0.5
+    }
   }
 }
 
